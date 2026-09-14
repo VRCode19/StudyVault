@@ -6,7 +6,7 @@ import { Button } from '../common/Button';
 import { ChatMessage } from './ChatMessage';
 
 export const AIChat: React.FC<{ fullHeight?: boolean }> = ({ fullHeight = true }) => {
-  const { chatMessages, sendChatMessage } = useStudyVault();
+  const { chatMessages, sendChatMessage, isAiThinking } = useStudyVault();
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -16,11 +16,11 @@ export const AIChat: React.FC<{ fullHeight?: boolean }> = ({ fullHeight = true }
 
   useEffect(() => {
     scrollToBottom();
-  }, [chatMessages]);
+  }, [chatMessages, isAiThinking]);
 
   const handleSend = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!input.trim()) return;
+    if (!input.trim() || isAiThinking) return;
     sendChatMessage(input.trim());
     setInput('');
   };
@@ -70,6 +70,12 @@ export const AIChat: React.FC<{ fullHeight?: boolean }> = ({ fullHeight = true }
         {chatMessages.map((msg) => (
           <ChatMessage key={msg.id} message={msg} />
         ))}
+        {isAiThinking && (
+          <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-dark-850/60 border border-cyan-500/20 text-cyan-300 text-xs animate-pulse max-w-sm">
+            <Bot className="w-4 h-4 animate-spin text-cyan-400" />
+            <span>Consulting backend schedule & exam runway...</span>
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
 
@@ -82,8 +88,9 @@ export const AIChat: React.FC<{ fullHeight?: boolean }> = ({ fullHeight = true }
           {quickPrompts.map((item, idx) => (
             <button
               key={idx}
+              disabled={isAiThinking}
               onClick={() => sendChatMessage(item.label)}
-              className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/[0.04] hover:bg-white/[0.09] text-slate-300 hover:text-white text-xs whitespace-nowrap border border-white/10 transition-colors shrink-0"
+              className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/[0.04] hover:bg-white/[0.09] text-slate-300 hover:text-white text-xs whitespace-nowrap border border-white/10 transition-colors shrink-0 disabled:opacity-40"
             >
               {item.icon}
               <span>{item.label}</span>
@@ -98,13 +105,14 @@ export const AIChat: React.FC<{ fullHeight?: boolean }> = ({ fullHeight = true }
           <input
             type="text"
             value={input}
+            disabled={isAiThinking}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Tell Studyvault what you need..."
-            className="w-full pl-4 pr-12 py-3.5 rounded-xl bg-dark-950/80 text-white placeholder-slate-500 border border-white/10 focus:border-cyan-500/50 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 text-sm"
+            placeholder={isAiThinking ? 'AI is processing...' : 'Tell Studyvault what you need...'}
+            className="w-full pl-4 pr-12 py-3.5 rounded-xl bg-dark-950/80 text-white placeholder-slate-500 border border-white/10 focus:border-cyan-500/50 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 text-sm disabled:opacity-50"
           />
           <button
             type="submit"
-            disabled={!input.trim()}
+            disabled={!input.trim() || isAiThinking}
             className="absolute right-2 p-2.5 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-500 text-white disabled:opacity-40 disabled:pointer-events-none hover:shadow-cyan-glow transition-all active:scale-95"
             aria-label="Send message"
           >

@@ -21,6 +21,8 @@ import {
   INITIAL_SETTINGS,
 } from '../mock/demoData';
 
+import { aiService } from '../services/aiService';
+
 export interface ToastItem {
   id: string;
   title: string;
@@ -45,13 +47,14 @@ interface StudyVaultContextType {
   setIsAiDrawerOpen: (open: boolean) => void;
   selectedSession: StudySession | null;
   setSelectedSession: (session: StudySession | null) => void;
+  isAiThinking: boolean;
   
   // Actions
   toggleSessionComplete: (sessionId: string) => void;
   rescheduleSession: (sessionId: string, newDay: DayOfWeek, newTime: string, reason?: string) => void;
   splitSession: (sessionId: string) => void;
   simulateMissedSession: () => void;
-  sendChatMessage: (text: string) => void;
+  sendChatMessage: (text: string) => Promise<void>;
   applyChatActionCard: (messageId: string) => void;
   updateSettings: (newSettings: Partial<StudySettings>) => void;
   resetDemoData: () => void;
@@ -61,7 +64,7 @@ interface StudyVaultContextType {
   clearAllNotifications: () => void;
   isParsingSyllabus: boolean;
   parsingStep: number;
-  runSyllabusParser: () => Promise<void>;
+  runSyllabusParser: (fileOrText?: File | string) => Promise<void>;
 }
 
 const StudyVaultContext = createContext<StudyVaultContextType | undefined>(undefined);
@@ -104,6 +107,7 @@ export const StudyVaultProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const [isAiDrawerOpen, setIsAiDrawerOpen] = useState<boolean>(false);
   const [selectedSession, setSelectedSession] = useState<StudySession | null>(null);
+  const [isAiThinking, setIsAiThinking] = useState<boolean>(false);
 
   // Parsing animation state
   const [isParsingSyllabus, setIsParsingSyllabus] = useState<boolean>(false);
@@ -304,7 +308,7 @@ export const StudyVaultProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     );
   };
 
-  const sendChatMessage = (text: string) => {
+  const sendChatMessage = async (text: string) => {
     const userMsg: ChatMessage = {
       id: 'msg-' + Date.now(),
       sender: 'user',
@@ -313,63 +317,35 @@ export const StudyVaultProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     };
 
     setChatMessages((prev) => [...prev, userMsg]);
+    setIsAiThinking(true);
 
-    // Simulate smart AI response
-    setTimeout(() => {
-      const lower = text.toLowerCase();
-      let replyText = "I've analyzed your current study schedule, pace, and upcoming exam deadlines.";
-      let actionCard = undefined;
-
-      if (lower.includes('tired') || lower.includes('push') || lower.includes('postpone') || lower.includes('delay')) {
-        replyText = "No problem! Rest is critical for long-term memory encoding. I've redistributed today's remaining sessions across your Saturday and Sunday buffer slots without compromising your End Semester exam deadline.";
-        actionCard = {
-          type: 'schedule-update' as const,
-          title: 'Adaptive Redistribution — Exam Deadline Safe',
-          originalSummary: '2 pending sessions postponed from today',
-          updatedSummary: 'Moved to Saturday (14:00) & Sunday (10:30)',
-          shifts: [
-            { subject: 'Database Systems (Normalization)', from: 'Today 11:00', to: 'Sat 14:00', duration: '45m' },
-            { subject: 'Computer Networks (TCP Handshake)', from: 'Today 16:30', to: 'Sun 10:30', duration: '45m' },
-          ],
-          deadlineProtected: true,
-          applied: true,
-        };
-
-        // Also update the session list
-        setSessions((prev) =>
-          prev.map((s) => {
-            if (s.id === 'sess-today-2') {
-              return { ...s, dayOfWeek: 'SAT', startTime: '14:00', endTime: '14:45', isAdaptive: true, adaptiveReason: 'Pushed via AI Assistant' };
-            }
-            if (s.id === 'sess-today-3') {
-              return { ...s, dayOfWeek: 'SUN', startTime: '10:30', endTime: '11:15', isAdaptive: true, adaptiveReason: 'Pushed via AI Assistant' };
-            }
-            return s;
-          })
-        );
-        showToast('Schedule Adapted', 'Postponed sessions safely redistributed.', 'adaptive');
-      } else if (lower.includes('plan tomorrow') || lower.includes('tomorrow')) {
-        replyText = "Here is your recommended itinerary for tomorrow (Saturday). You have 2 focus sessions scheduled: Data Structures Graph representations (75 min) and Database Normalization follow-up (30 min). Total planned time: 1h 45m.";
-      } else if (lower.includes('progress') || lower.includes('how am i doing') || lower.includes('status')) {
-        replyText = "You're at 68% total syllabus completion across all 4 subjects. Data Structures is your strongest subject (82%), while Operating Systems needs attention (48%). At your current velocity of 1.4 topics/day, you will complete the syllabus 3 days before your first exam!";
-      } else if (lower.includes('what should i study') || lower.includes('recommend') || lower.includes('next')) {
-        replyText = "I recommend focusing on 'Operating Systems: Virtual Memory & Page Replacement'. It has a high exam yield (15% weighting) and you currently have a 5-day gap since the last OS revision.";
-      } else if (lower.includes('exam') || lower.includes('deadline')) {
-        replyText = "Your earliest deadline is the Data Structures Lab Exam in 6 days (Sep 17), followed by Database Normalization Quiz in 11 days (Sep 22), and the Comprehensive End Semester Exam in 18 days (Sep 29). All 3 deadlines are currently in 'Protected' status.";
-      } else {
-        replyText = `Understood. Studyvault's scheduling engine will adjust your daily pace to accommodate "${text}". Let me know if you want me to re-weight your subjects or allocate extra deep-work blocks!`;
-      }
-
+    try {
+      const response = await aiService.askAssistant(text, [...chatMessages, userMsg]);
       const aiMsg: ChatMessage = {
         id: 'msg-' + (Date.now() + 1),
         sender: 'assistant',
-        text: replyText,
+        text: response.replyText,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        actionCard,
+        actionCard: response.actionCard,
+        toolsUsed: response.toolsUsed,
       };
-
       setChatMessages((prev) => [...prev, aiMsg]);
-    }, 850);
+      if (response.actionCard) {
+        showToast('Schedule Adapted', 'Proposed schedule shifts ready for review.', 'adaptive');
+      }
+    } catch (err: any) {
+      console.warn('[AIChat] AI service call failed, providing informative fallback:', err);
+      const aiMsg: ChatMessage = {
+        id: 'msg-' + (Date.now() + 1),
+        sender: 'assistant',
+        text: `I encountered an issue contacting the AI strategist service (${err?.message || 'Connection error'}). Ensure the AI server is running on port 5001 with your OPENROUTER_API_KEY in server/.env.`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+      setChatMessages((prev) => [...prev, aiMsg]);
+      showToast('AI Service Notice', 'Could not reach server on port 5001.', 'warning');
+    } finally {
+      setIsAiThinking(false);
+    }
   };
 
   const applyChatActionCard = (messageId: string) => {
@@ -382,6 +358,31 @@ export const StudyVaultProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             nextApplied ? 'Your adaptive schedule has been locked in.' : 'Restored previous timetable.',
             'info'
           );
+
+          if (nextApplied && m.actionCard.shifts.length > 0) {
+            setSessions((prevSessions) =>
+              prevSessions.map((s) => {
+                const matchingShift = m.actionCard!.shifts.find(
+                  (shift) => shift.sessionId === s.id || s.subjectName.toLowerCase().includes(shift.subject.toLowerCase())
+                );
+                if (matchingShift) {
+                  const toParts = matchingShift.to.split(' ');
+                  const day = toParts[0] === 'Sat' ? 'SAT' : toParts[0] === 'Sun' ? 'SUN' : s.dayOfWeek;
+                  const time = toParts[1] || s.startTime;
+                  return {
+                    ...s,
+                    dayOfWeek: day as DayOfWeek,
+                    startTime: time,
+                    isAdaptive: true,
+                    adaptiveReason: 'Applied via AI Action Proposal',
+                    status: 'rescheduled' as const,
+                  };
+                }
+                return s;
+              })
+            );
+          }
+
           return {
             ...m,
             actionCard: {
@@ -420,26 +421,57 @@ export const StudyVaultProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     showToast('Notifications Cleared', 'All alerts cleared.', 'info');
   };
 
-  const runSyllabusParser = async () => {
+  const runSyllabusParser = async (fileOrText?: File | string) => {
     setIsParsingSyllabus(true);
     setParsingStep(1);
 
-    const steps = [
-      { step: 1, delay: 900 },  // "Reading syllabus..."
-      { step: 2, delay: 1000 }, // "Identifying subjects..."
-      { step: 3, delay: 1100 }, // "Breaking modules into topics..."
-      { step: 4, delay: 1000 }, // "Estimating study time..."
-      { step: 5, delay: 900 },  // "Building your schedule..."
-    ];
+    const stepInterval = setInterval(() => {
+      setParsingStep((curr) => (curr < 4 ? curr + 1 : curr));
+    }, 1000);
 
-    for (const item of steps) {
-      await new Promise((resolve) => setTimeout(resolve, item.delay));
-      setParsingStep(item.step + 1);
+    try {
+      if (fileOrText) {
+        const result = await aiService.analyzeSyllabus(fileOrText);
+        clearInterval(stepInterval);
+        setParsingStep(5);
+
+        if (result.status === 'unreadable') {
+          showToast(
+            'Unreadable Document',
+            result.rejectionReason || 'The document does not contain discernible syllabus topics.',
+            'warning'
+          );
+          setIsParsingSyllabus(false);
+          return;
+        }
+
+        if (result.subjects && result.subjects.length > 0) {
+          const domainSubjects = aiService.mapExtractedSubjectsToDomain(result.subjects);
+          setSubjects(domainSubjects);
+          showToast(
+            'Syllabus Ingested!',
+            `${result.subjects.length} course(s) extracted into your study vault.`,
+            'success'
+          );
+          setActivePage('syllabus');
+        } else {
+          showToast('Analysis Complete', 'No subjects were extracted.', 'info');
+        }
+      } else {
+        await new Promise((resolve) => setTimeout(resolve, 3500));
+        clearInterval(stepInterval);
+        setParsingStep(5);
+        showToast('Syllabus Ingested!', 'Sample curriculum loaded into your study vault.', 'success');
+        setActivePage('syllabus');
+      }
+    } catch (err: any) {
+      clearInterval(stepInterval);
+      console.error('[SyllabusParser] Analysis failed:', err);
+      showToast('Parser Notice', `Could not complete AI extraction: ${err?.message || 'Server error'}.`, 'warning');
+      setActivePage('syllabus');
+    } finally {
+      setIsParsingSyllabus(false);
     }
-
-    setIsParsingSyllabus(false);
-    showToast('Syllabus Ingested!', '4 subjects & 36 topics extracted into an adaptive schedule.', 'success');
-    setActivePage('syllabus');
   };
 
   return (
@@ -461,6 +493,7 @@ export const StudyVaultProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setIsAiDrawerOpen,
         selectedSession,
         setSelectedSession,
+        isAiThinking,
         toggleSessionComplete,
         rescheduleSession,
         splitSession,
