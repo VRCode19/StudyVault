@@ -31,18 +31,20 @@ export const SyllabusUploader: React.FC = () => {
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      runSyllabusParser();
+      runSyllabusParser(e.target.files[0]);
     }
   };
 
   const handlePasteSubmit = () => {
     setIsPasteModalOpen(false);
-    runSyllabusParser();
+    if (pasteText.trim()) {
+      runSyllabusParser(pasteText.trim());
+    }
   };
 
   const handleLoadSample = () => {
     setPasteText(SAMPLE_SYLLABUS_TEXT);
-    runSyllabusParser();
+    runSyllabusParser(SAMPLE_SYLLABUS_TEXT);
   };
 
   return (

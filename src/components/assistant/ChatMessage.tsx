@@ -36,6 +36,21 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
 
         <p className="whitespace-pre-wrap">{message.text}</p>
 
+        {/* Tools executed badge if present */}
+        {message.toolsUsed && message.toolsUsed.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 mt-2.5 pt-2 border-t border-white/[0.06]">
+            <span className="text-[10px] font-mono text-slate-500 uppercase">Grounded tools:</span>
+            {message.toolsUsed.map((tool, idx) => (
+              <span
+                key={idx}
+                className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-cyan-500/10 text-cyan-300 border border-cyan-500/20"
+              >
+                {tool}
+              </span>
+            ))}
+          </div>
+        )}
+
         {/* Embedded Action Card if present */}
         {message.actionCard && (
           <div className="mt-3.5 p-4 rounded-xl bg-dark-900/90 border border-cyan-500/30 shadow-cyan-glow/10 space-y-3">

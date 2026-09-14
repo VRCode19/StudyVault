@@ -62,6 +62,7 @@ export interface AdaptiveNotification {
 }
 
 export interface ScheduleShift {
+  sessionId?: string;
   subject: string;
   from: string;
   to: string;
@@ -84,6 +85,7 @@ export interface ChatMessage {
   text: string;
   timestamp: string;
   actionCard?: ChatActionCard;
+  toolsUsed?: string[];
 }
 
 export interface ExamDeadline {
