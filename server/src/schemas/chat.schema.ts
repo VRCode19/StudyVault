@@ -8,8 +8,9 @@ export const ChatMessageInputSchema = z.object({
 });
 
 export const ChatRequestSchema = z.object({
-  message: z.string().min(1, 'User message cannot be empty').max(3000, 'Message exceeds length limit'),
+  message: z.string().min(1, 'User message cannot be empty').max(5000, 'Message exceeds length limit'),
   history: z.array(ChatMessageInputSchema).default([]),
+  conversation_id: z.string().optional(),
 });
 
 export const ActionCardShiftSchema = z.object({
@@ -30,10 +31,18 @@ export const ActionCardSchema = z.object({
   applied: z.boolean().default(false),
 });
 
+export const ActionSchema = z.object({
+  type: z.string(),
+  status: z.string(),
+  details: z.any().optional(),
+});
+
 export const ChatResponseSchema = z.object({
   replyText: z.string(),
   actionCard: ActionCardSchema.optional(),
   toolsUsed: z.array(z.string()).optional(),
+  actions: z.array(ActionSchema).optional(),
+  extractionData: z.any().optional(),
 });
 
 export type ChatRequest = z.infer<typeof ChatRequestSchema>;

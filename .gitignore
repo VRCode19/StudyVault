@@ -24,3 +24,6 @@ dist-ssr
 *.sw?
 
 server/.env
+.env
+.env.local
+.env.*.local

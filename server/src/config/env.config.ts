@@ -9,7 +9,10 @@ export const config = {
   openrouter: {
     apiKey: process.env.OPENROUTER_API_KEY || '',
     baseUrl: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
-    model: process.env.OPENROUTER_MODEL || 'google/gemini-2.5-flash',
+    chatModel: process.env.OPENROUTER_CHAT_MODEL || process.env.OPENROUTER_MODEL || 'google/gemini-2.5-flash',
+    visionModel: process.env.OPENROUTER_VISION_MODEL || 'google/gemini-2.5-flash',
+    // Legacy fallback
+    model: process.env.OPENROUTER_CHAT_MODEL || process.env.OPENROUTER_MODEL || 'google/gemini-2.5-flash',
     fallbackModel: process.env.OPENROUTER_FALLBACK_MODEL || 'anthropic/claude-3.5-sonnet',
   },
 

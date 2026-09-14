@@ -28,7 +28,64 @@ Traditional study schedules fail because they are rigid: missing one morning ses
 - **Cognitive Load Balancing**: Syllabus modules are weighted by difficulty (Easy, Medium, Hard) and matched to your peak daily focus hours.
 
 > [!NOTE]
-> This is a **frontend-only** production-grade SaaS architecture. All AI assistant conversations, syllabus parsing workflows, calendar reorganizations, and progress analytics run on local state with persistent browser `localStorage`. No external backend or database setup is required.
+> Studyvault features a modern decoupled architecture: a React 19 + Vite Neo-Tactile frontend paired with a dedicated **server-side AI engine** powered by **OpenRouter**. The AI runs multi-turn tool-grounded conversations, multimodal vision analysis (timetables, exams, syllabi), and adaptive schedule recalculation. The AI service runs both as a local Express server and as **Vercel Serverless Functions**.
+
+---
+
+## 🧠 Intelligent AI Architecture & OpenRouter Engine
+
+Studyvault transforms study planning from static calendars into an active, adaptive AI study manager. All AI operations run strictly server-side with zero prompt exposure or client-side key leakage.
+
+### 1. Provider & Multimodal Models
+- **AI Provider**: [OpenRouter](https://openrouter.ai/)
+- **Chat & Strategist Model**: Configured via `OPENROUTER_CHAT_MODEL` (default: `google/gemini-2.5-flash` or any OpenRouter model like `anthropic/claude-3.5-sonnet`)
+- **Multimodal Vision Model**: Configured via `OPENROUTER_VISION_MODEL` (default: `google/gemini-2.5-flash` with native vision capabilities)
+- **Zero Hallucination Grounding**: The AI is forbidden from guessing schedules, exams, or topic completion. It reads directly from grounded backend tools before answering.
+
+### 2. Vision Analysis Engine
+Students can upload pictures of documents directly into the chat or syllabus uploader:
+- **Automatic Document Detection**: Classifies uploaded images into `timetable`, `exam_timetable`, `syllabus`, or `module_details`.
+- **Class Timetable Extraction**: Extracts days, lecture time blocks, course names, and classrooms into structured schemas.
+- **Exam Datesheet Extraction**: Detects exam dates, session timings, and paper codes to anchor deadlines.
+- **Academic Syllabus & Module Breakdown**: Structures courses into modules and discrete topics with difficulty ratings and estimated study times.
+- **Multi-File & Drag-and-Drop**: Upload multiple module screenshots or pages simultaneously.
+- **Confidence Scoring**: Returns confidence metrics (`high`, `medium`, `low`) and highlights ambiguities for student review.
+
+### 3. 18 Grounded AI Function-Calling Tools
+The AI agent interacts with your academic state exclusively through 18 verified tools:
+
+| Category | Tool | Description |
+| :--- | :--- | :--- |
+| **Schedule Read** | `get_user_schedule` | Fetch scheduled sessions for a date range |
+| | `get_today_schedule` | Fetch today's study sessions and urgent tasks |
+| | `get_week_schedule` | Full weekly timetable view |
+| | `get_available_study_time` | Capacity minus scheduled lecture/study slots |
+| **Progress Read** | `get_user_profile` | Student name, streak, total and completed topics |
+| | `get_subject_progress` | Real enrolled courses, topics mastered, percentages |
+| | `get_exam_deadlines` | Confirmed upcoming exam dates and countdown days |
+| | `get_remaining_topics` | Pending topics requiring study allocation |
+| | `get_study_preferences` | Daily capacity, preferred focus windows, rhythm |
+| **Actions & Schedule** | `create_study_session` | Add a verified session to the timetable |
+| | `update_study_session` | Modify session time, date, or duration |
+| | `complete_study_session` | Mark session done and advance progress |
+| | `mark_session_missed` | Trigger autonomous redistribution across open buffers |
+| | `reschedule_session` | Shift session to another verified slot |
+| | `create_subject` | Register a new subject from extracted syllabus |
+| | `create_module` | Register an individual module under a subject |
+| | `create_schedule` | Generate full academic timetable plan |
+| | `propose_schedule_shifts` | Propose interactive Action Card for user confirmation |
+
+### 4. Interactive Action Cards & Proposals
+When the student asks to adjust study sessions or reports fatigue, the AI generates interactive action cards:
+- **Schedule Update Cards**: Shows previous slots, adapted slots, and safety verification with one-click **Apply** or **Undo** triggers.
+- **Extraction Preview Cards**: Displays extracted timetables or exam dates with **Confirm & Apply** buttons.
+- **Schedule Proposal Cards**: Full multi-session plan preview for onboarding confirmation.
+- **Onboarding Progress Cards**: Dynamic checklist tracking setup milestones.
+
+### 5. Decoupled Backend Adapter Pattern
+The AI service connects to the backend through a clean `IBackendAdapter` interface:
+- **`MockBackendAdapter`** (Default): Self-contained local state simulating a real backend with realistic sessions, subjects, and exams. Perfect for immediate development and testing without spinning up databases.
+- **`HttpBackendAdapter`**: Ready for your backend developer. Forwards all tool calls to real REST endpoints with bearer token passthrough. Switching modes is as simple as setting `BACKEND_MODE=http`.
 
 ---
 
@@ -188,9 +245,10 @@ StudyVault/
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) (version 18.0 or newer recommended)
-- `npm` or `pnpm` or `yarn`
+- `npm` (comes with Node.js)
+- An [OpenRouter API Key](https://openrouter.ai/keys) for live AI capabilities
 
-### Installation
+### Installation & Environment Setup
 
 1. **Clone the repository**:
    ```bash
@@ -198,27 +256,67 @@ StudyVault/
    cd StudyVault
    ```
 
-2. **Install dependencies**:
+2. **Install root & server dependencies**:
    ```bash
    npm install
+   cd server && npm install && cd ..
    ```
 
-3. **Start the development server**:
+3. **Configure Environment Variables**:
+   Create `server/.env` (or copy from `server/.env.example`):
+   ```bash
+   cp server/.env.example server/.env
+   ```
+   Edit `server/.env`:
+   ```env
+   # Required for live OpenRouter AI operations
+   OPENROUTER_API_KEY=your_openrouter_api_key_here
+
+   # Dedicated Models (configurable independently)
+   OPENROUTER_CHAT_MODEL=google/gemini-2.5-flash
+   OPENROUTER_VISION_MODEL=google/gemini-2.5-flash
+
+   # Service Configuration
+   PORT=5001
+   CORS_ORIGIN=http://localhost:5173
+
+   # Backend Integration: 'mock' for local grounded state, 'http' for real backend
+   BACKEND_MODE=mock
+   ```
+
+### Running Locally
+
+1. **Start the AI Service** (terminal 1):
+   ```bash
+   npm run dev:server
+   ```
+   Runs the Express AI service with hot reload on [http://localhost:5001](http://localhost:5001).
+
+2. **Start the Frontend** (terminal 2):
    ```bash
    npm run dev
    ```
    Open [http://localhost:5173](http://localhost:5173) in your browser.
 
-4. **Build for production**:
-   ```bash
-   npm run build
-   ```
-   The production-ready assets will be compiled into the `dist/` folder.
+### Running the AI Test Suite
 
-5. **Preview production bundle locally**:
-   ```bash
-   npm run preview
-   ```
+Verify all 18 tools, vision extraction schemas, and conversation state management:
+```bash
+npm run test:ai
+```
+
+### Vercel Deployment
+
+Studyvault is configured for zero-friction Vercel deployment with both the frontend SPA and serverless AI functions:
+
+1. Push your repository to GitHub / GitLab / Bitbucket.
+2. Import the project into [Vercel](https://vercel.com).
+3. Under **Project Settings → Environment Variables**, add:
+   - `OPENROUTER_API_KEY`: Your OpenRouter secret key.
+   - `OPENROUTER_CHAT_MODEL`: `google/gemini-2.5-flash` (or preferred model).
+   - `OPENROUTER_VISION_MODEL`: `google/gemini-2.5-flash`.
+   - `BACKEND_MODE`: `mock` (or `http` once your backend is ready).
+4. Deploy! Vercel will automatically build the Vite frontend (`npm run build`) and route all `/api/ai/*` endpoints to the serverless functions under `api/ai/`.
 
 ---
 

@@ -69,7 +69,7 @@ export interface ScheduleShift {
   duration: string;
 }
 
-export interface ChatActionCard {
+export interface ScheduleUpdateCard {
   type: 'schedule-update';
   title: string;
   originalSummary: string;
@@ -79,12 +79,126 @@ export interface ChatActionCard {
   applied: boolean;
 }
 
+export interface TimetableSlotItem {
+  day: string;
+  timeSlot: string;
+  subject: string;
+  room?: string;
+  type?: string;
+}
+
+export interface ExamDateItem {
+  subject: string;
+  date: string;
+  time?: string;
+  code?: string;
+  venue?: string;
+}
+
+export interface SyllabusSubjectItem {
+  name: string;
+  code: string;
+  modules?: {
+    moduleNumber: number;
+    title: string;
+    topics: {
+      name: string;
+      estimatedMinutes?: number;
+      difficulty?: 'easy' | 'medium' | 'hard';
+    }[];
+  }[];
+  topics?: {
+    name: string;
+    estimatedMinutes?: number;
+    difficulty?: 'easy' | 'medium' | 'hard';
+  }[];
+}
+
+export interface ExtractionPreview {
+  document_type: 'timetable' | 'exam_timetable' | 'syllabus' | 'module_details' | 'unknown';
+  confidence: 'high' | 'medium' | 'low';
+  confidenceScore?: number;
+  warnings?: string[];
+  timetable?: {
+    weeklySchedule: {
+      day: string;
+      slots: TimetableSlotItem[];
+    }[];
+  };
+  examTimetable?: {
+    exams: ExamDateItem[];
+  };
+  syllabus?: {
+    subjects: SyllabusSubjectItem[];
+  };
+  moduleDetails?: {
+    subjectName: string;
+    moduleNumber: number;
+    moduleTitle: string;
+    topics: {
+      name: string;
+      estimatedMinutes: number;
+      difficulty: 'easy' | 'medium' | 'hard';
+    }[];
+  };
+  confirmed?: boolean;
+}
+
+export interface ExtractionPreviewCardData {
+  type: 'extraction-preview';
+  title: string;
+  extraction: ExtractionPreview;
+  applied?: boolean;
+}
+
+export interface ScheduleProposalCardData {
+  type: 'schedule-proposal';
+  title: string;
+  description: string;
+  totalHours: number;
+  sessionsCount: number;
+  sessions: {
+    day: string;
+    subject: string;
+    topic: string;
+    time: string;
+    duration: number;
+  }[];
+  applied: boolean;
+}
+
+export interface OnboardingProgressCardData {
+  type: 'onboarding-progress';
+  title: string;
+  step: string;
+  completedSteps: string[];
+  pendingSteps: string[];
+  percentage: number;
+  applied?: boolean;
+}
+
+export type ChatActionCard =
+  | ScheduleUpdateCard
+  | ExtractionPreviewCardData
+  | ScheduleProposalCardData
+  | OnboardingProgressCardData;
+
+export interface ChatAttachment {
+  id: string;
+  name: string;
+  size: number;
+  previewUrl: string;
+  type: 'image' | 'pdf' | 'text';
+}
+
 export interface ChatMessage {
   id: string;
   sender: 'user' | 'assistant';
   text: string;
   timestamp: string;
+  attachments?: ChatAttachment[];
   actionCard?: ChatActionCard;
+  extractionPreview?: ExtractionPreview;
   toolsUsed?: string[];
 }
 

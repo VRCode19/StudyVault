@@ -83,6 +83,8 @@ export class SyllabusService {
       console.error('[SyllabusService] Failed to parse model output as JSON:', contentText);
       return {
         status: 'unreadable',
+        confidence: 'low',
+        document_type: 'syllabus',
         confidenceScore: 0.0,
         rejectionReason:
           'Could not parse curriculum output from the document. Please ensure the document is clear.',
@@ -103,6 +105,8 @@ export class SyllabusService {
       if (Array.isArray(parsedJson.subjects) && parsedJson.subjects.length > 0) {
         return {
           status: 'ambiguous',
+          confidence: 'medium',
+          document_type: 'syllabus',
           confidenceScore: 0.6,
           rejectionReason: 'Extracted partial curriculum with non-standard fields.',
           subjects: parsedJson.subjects.map((sub: any, idx: number) => ({
@@ -127,6 +131,8 @@ export class SyllabusService {
 
       return {
         status: 'unreadable',
+        confidence: 'low',
+        document_type: 'syllabus',
         confidenceScore: 0.0,
         rejectionReason:
           parsedJson.rejectionReason ||

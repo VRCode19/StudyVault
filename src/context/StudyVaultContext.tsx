@@ -10,6 +10,7 @@ import {
   UserStats,
   StudySettings,
   DayOfWeek,
+  ChatAttachment,
 } from '../types/studyvault';
 import {
   INITIAL_STATS,
@@ -48,14 +49,16 @@ interface StudyVaultContextType {
   selectedSession: StudySession | null;
   setSelectedSession: (session: StudySession | null) => void;
   isAiThinking: boolean;
+  conversationId: string;
   
   // Actions
   toggleSessionComplete: (sessionId: string) => void;
   rescheduleSession: (sessionId: string, newDay: DayOfWeek, newTime: string, reason?: string) => void;
   splitSession: (sessionId: string) => void;
   simulateMissedSession: () => void;
-  sendChatMessage: (text: string) => Promise<void>;
+  sendChatMessage: (text: string, files?: File[]) => Promise<void>;
   applyChatActionCard: (messageId: string) => void;
+  confirmExtraction: (messageId: string) => void;
   updateSettings: (newSettings: Partial<StudySettings>) => void;
   resetDemoData: () => void;
   showToast: (title: string, message: string, type?: ToastItem['type']) => void;
@@ -64,7 +67,7 @@ interface StudyVaultContextType {
   clearAllNotifications: () => void;
   isParsingSyllabus: boolean;
   parsingStep: number;
-  runSyllabusParser: (fileOrText?: File | string) => Promise<void>;
+  runSyllabusParser: (fileOrText?: File | File[] | string) => Promise<void>;
 }
 
 const StudyVaultContext = createContext<StudyVaultContextType | undefined>(undefined);
@@ -96,11 +99,22 @@ export const StudyVaultProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return saved ? JSON.parse(saved) : INITIAL_STATS;
   });
 
-  const [exams] = useState<ExamDeadline[]>(INITIAL_EXAMS);
+  const [exams, setExams] = useState<ExamDeadline[]>(() => {
+    const saved = localStorage.getItem('studyvault_exams');
+    return saved ? JSON.parse(saved) : INITIAL_EXAMS;
+  });
   
   const [settings, setSettings] = useState<StudySettings>(() => {
     const saved = localStorage.getItem('studyvault_settings');
     return saved ? JSON.parse(saved) : INITIAL_SETTINGS;
+  });
+
+  const [conversationId] = useState<string>(() => {
+    const saved = sessionStorage.getItem('studyvault_conv_id');
+    if (saved) return saved;
+    const newId = 'conv-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8);
+    sessionStorage.setItem('studyvault_conv_id', newId);
+    return newId;
   });
 
   const [toasts, setToasts] = useState<ToastItem[]>([]);
@@ -308,37 +322,60 @@ export const StudyVaultProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     );
   };
 
-  const sendChatMessage = async (text: string) => {
+  const sendChatMessage = async (text: string, files?: File[]) => {
+    const attachments: ChatAttachment[] =
+      files?.map((f) => ({
+        id: `att-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        name: f.name,
+        size: f.size,
+        type: f.type.startsWith('image/')
+          ? ('image' as const)
+          : f.type === 'application/pdf'
+          ? ('pdf' as const)
+          : ('text' as const),
+        previewUrl: f.type.startsWith('image/') ? URL.createObjectURL(f) : '',
+      })) || [];
+
     const userMsg: ChatMessage = {
       id: 'msg-' + Date.now(),
       sender: 'user',
       text,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      attachments: attachments.length > 0 ? attachments : undefined,
     };
 
     setChatMessages((prev) => [...prev, userMsg]);
     setIsAiThinking(true);
 
     try {
-      const response = await aiService.askAssistant(text, [...chatMessages, userMsg]);
+      const response = await aiService.askAssistant(text, [...chatMessages, userMsg], {
+        files,
+        conversationId,
+      });
+
       const aiMsg: ChatMessage = {
         id: 'msg-' + (Date.now() + 1),
         sender: 'assistant',
         text: response.replyText,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         actionCard: response.actionCard,
+        extractionPreview: response.extractionData,
         toolsUsed: response.toolsUsed,
       };
+
       setChatMessages((prev) => [...prev, aiMsg]);
+
       if (response.actionCard) {
         showToast('Schedule Adapted', 'Proposed schedule shifts ready for review.', 'adaptive');
+      } else if (response.extractionData) {
+        showToast('Document Analyzed', 'Extracted academic structure ready to confirm.', 'success');
       }
     } catch (err: any) {
       console.warn('[AIChat] AI service call failed, providing informative fallback:', err);
       const aiMsg: ChatMessage = {
         id: 'msg-' + (Date.now() + 1),
         sender: 'assistant',
-        text: `I encountered an issue contacting the AI strategist service (${err?.message || 'Connection error'}). Ensure the AI server is running on port 5001 with your OPENROUTER_API_KEY in server/.env.`,
+        text: `I encountered an issue contacting the AI strategist service (${err?.message || 'Connection error'}). Ensure the AI server is running on port 5001 with your OPENROUTER_API_KEY configured.`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
       setChatMessages((prev) => [...prev, aiMsg]);
@@ -348,48 +385,170 @@ export const StudyVaultProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
+  const confirmExtraction = (messageId: string) => {
+    setChatMessages((prev) =>
+      prev.map((msg) => {
+        if (msg.id === messageId) {
+          const extraction =
+            msg.extractionPreview ||
+            (msg.actionCard?.type === 'extraction-preview' ? msg.actionCard.extraction : null);
+
+          if (!extraction) return msg;
+
+          // If extraction contains syllabus data with subjects
+          if (extraction.syllabus && extraction.syllabus.subjects.length > 0) {
+            const domainSubjects = aiService.mapExtractedSubjectsToDomain(
+              extraction.syllabus.subjects as any
+            );
+            setSubjects((prevSubs) => [...prevSubs, ...domainSubjects]);
+            showToast(
+              'Curriculum Ingested',
+              `Added ${domainSubjects.length} subject(s) with modules to your StudyVault.`,
+              'success'
+            );
+          }
+
+          // If extraction contains exam timetable data
+          if (extraction.examTimetable && extraction.examTimetable.exams.length > 0) {
+            const newExams: ExamDeadline[] = extraction.examTimetable.exams.map((ex, idx) => ({
+              id: `exam-ai-${Date.now()}-${idx}`,
+              title: ex.subject,
+              subtitle: ex.code || 'Final Examination',
+              date: ex.date,
+              daysRemaining: Math.max(
+                1,
+                Math.ceil((new Date(ex.date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) || 14
+              ),
+              subjects: [ex.subject],
+              readinessPercentage: 45,
+            }));
+            setExams((prevExams) => [...prevExams, ...newExams]);
+            showToast(
+              'Exam Deadlines Synced',
+              `Added ${newExams.length} exam milestone(s) to your preparation countdown.`,
+              'adaptive'
+            );
+          }
+
+          // If extraction contains timetable data
+          if (extraction.timetable && extraction.timetable.weeklySchedule.length > 0) {
+            showToast(
+              'Timetable Grounded',
+              'Weekly classes locked in. AI has adapted study sessions around your lecture hours.',
+              'adaptive'
+            );
+          }
+
+          const updatedCard =
+            msg.actionCard?.type === 'extraction-preview'
+              ? { ...msg.actionCard, applied: true }
+              : msg.actionCard;
+
+          return {
+            ...msg,
+            extractionPreview: msg.extractionPreview
+              ? { ...msg.extractionPreview, confirmed: true }
+              : undefined,
+            actionCard: updatedCard,
+          };
+        }
+        return msg;
+      })
+    );
+  };
+
   const applyChatActionCard = (messageId: string) => {
     setChatMessages((prev) =>
       prev.map((m) => {
         if (m.id === messageId && m.actionCard) {
-          const nextApplied = !m.actionCard.applied;
-          showToast(
-            nextApplied ? 'Changes Confirmed' : 'Changes Reverted',
-            nextApplied ? 'Your adaptive schedule has been locked in.' : 'Restored previous timetable.',
-            'info'
-          );
-
-          if (nextApplied && m.actionCard.shifts.length > 0) {
-            setSessions((prevSessions) =>
-              prevSessions.map((s) => {
-                const matchingShift = m.actionCard!.shifts.find(
-                  (shift) => shift.sessionId === s.id || s.subjectName.toLowerCase().includes(shift.subject.toLowerCase())
-                );
-                if (matchingShift) {
-                  const toParts = matchingShift.to.split(' ');
-                  const day = toParts[0] === 'Sat' ? 'SAT' : toParts[0] === 'Sun' ? 'SUN' : s.dayOfWeek;
-                  const time = toParts[1] || s.startTime;
-                  return {
-                    ...s,
-                    dayOfWeek: day as DayOfWeek,
-                    startTime: time,
-                    isAdaptive: true,
-                    adaptiveReason: 'Applied via AI Action Proposal',
-                    status: 'rescheduled' as const,
-                  };
-                }
-                return s;
-              })
-            );
+          // Handle schedule-proposal card
+          if (m.actionCard.type === 'schedule-proposal') {
+            const nextApplied = !m.actionCard.applied;
+            if (nextApplied && m.actionCard.sessions.length > 0) {
+              const newSessions: StudySession[] = m.actionCard.sessions.map((sess, idx) => ({
+                id: `sess-prop-${Date.now()}-${idx}`,
+                subjectId: 'sub-prop',
+                subjectName: sess.subject,
+                subjectColor: '#06b6d4',
+                topicId: `top-prop-${idx}`,
+                topicName: sess.topic,
+                startTime: sess.time.split(' ')[0] || '10:00',
+                endTime: '11:00',
+                durationMinutes: sess.duration || 60,
+                date: new Date().toISOString().split('T')[0],
+                dayOfWeek: (sess.day.toUpperCase().slice(0, 3) as DayOfWeek) || 'MON',
+                status: 'pending',
+                isAdaptive: true,
+                adaptiveReason: 'Generated by StudyVault AI Onboarding Engine',
+              }));
+              setSessions((prev) => [...prev, ...newSessions]);
+              showToast(
+                'Schedule Locked In',
+                `Scheduled ${newSessions.length} sessions for your academic plan.`,
+                'success'
+              );
+            }
+            return {
+              ...m,
+              actionCard: {
+                ...m.actionCard,
+                applied: nextApplied,
+              },
+            };
           }
 
-          return {
-            ...m,
-            actionCard: {
-              ...m.actionCard,
-              applied: nextApplied,
-            },
-          };
+          // Handle extraction-preview card delegation
+          if (m.actionCard.type === 'extraction-preview') {
+            confirmExtraction(messageId);
+            return m;
+          }
+
+          // Handle standard schedule-update card
+          if (m.actionCard.type === 'schedule-update') {
+            const nextApplied = !m.actionCard.applied;
+            showToast(
+              nextApplied ? 'Changes Confirmed' : 'Changes Reverted',
+              nextApplied
+                ? 'Your adaptive schedule has been locked in.'
+                : 'Restored previous timetable.',
+              'info'
+            );
+
+            if (nextApplied && m.actionCard.shifts.length > 0) {
+              setSessions((prevSessions) =>
+                prevSessions.map((s) => {
+                  const matchingShift = (m.actionCard as any).shifts.find(
+                    (shift: any) =>
+                      shift.sessionId === s.id ||
+                      s.subjectName.toLowerCase().includes(shift.subject.toLowerCase())
+                  );
+                  if (matchingShift) {
+                    const toParts = matchingShift.to.split(' ');
+                    const day =
+                      toParts[0] === 'Sat' ? 'SAT' : toParts[0] === 'Sun' ? 'SUN' : s.dayOfWeek;
+                    const time = toParts[1] || s.startTime;
+                    return {
+                      ...s,
+                      dayOfWeek: day as DayOfWeek,
+                      startTime: time,
+                      isAdaptive: true,
+                      adaptiveReason: 'Applied via AI Action Proposal',
+                      status: 'rescheduled' as const,
+                    };
+                  }
+                  return s;
+                })
+              );
+            }
+
+            return {
+              ...m,
+              actionCard: {
+                ...m.actionCard,
+                applied: nextApplied,
+              },
+            };
+          }
         }
         return m;
       })
@@ -408,6 +567,7 @@ export const StudyVaultProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setChatMessages(INITIAL_CHAT_MESSAGES);
     setStats(INITIAL_STATS);
     setSettings(INITIAL_SETTINGS);
+    setExams(INITIAL_EXAMS);
     localStorage.clear();
     showToast('Demo Reset', 'Default student profile and timetable restored.', 'info');
   };
@@ -421,7 +581,7 @@ export const StudyVaultProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     showToast('Notifications Cleared', 'All alerts cleared.', 'info');
   };
 
-  const runSyllabusParser = async (fileOrText?: File | string) => {
+  const runSyllabusParser = async (fileOrText?: File | File[] | string) => {
     setIsParsingSyllabus(true);
     setParsingStep(1);
 
@@ -494,12 +654,14 @@ export const StudyVaultProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         selectedSession,
         setSelectedSession,
         isAiThinking,
+        conversationId,
         toggleSessionComplete,
         rescheduleSession,
         splitSession,
         simulateMissedSession,
         sendChatMessage,
         applyChatActionCard,
+        confirmExtraction,
         updateSettings,
         resetDemoData,
         showToast,

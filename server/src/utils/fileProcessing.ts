@@ -3,13 +3,32 @@ export interface ProcessedFile {
   dataUri: string;
   isText: boolean;
   textContent?: string;
+  originalName: string;
 }
 
+const SUPPORTED_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'application/pdf',
+  'text/plain',
+  'text/markdown',
+  'application/json',
+]);
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
 export function processUploadedFile(file: Express.Multer.File): ProcessedFile {
+  // Validate file size
+  if (file.size > MAX_FILE_SIZE) {
+    throw new Error(`File "${file.originalname}" exceeds the 10MB size limit.`);
+  }
+
   const mimeType = file.mimetype;
   const buffer = file.buffer;
 
-  // If text file or markdown
+  // Text files
   if (
     mimeType.includes('text') ||
     mimeType.includes('json') ||
@@ -22,10 +41,11 @@ export function processUploadedFile(file: Express.Multer.File): ProcessedFile {
       dataUri: '',
       isText: true,
       textContent: text,
+      originalName: file.originalname,
     };
   }
 
-  // If image or PDF, convert to base64 data URI
+  // Image or PDF → base64 data URI
   const base64 = buffer.toString('base64');
   let effectiveMimeType = mimeType;
 
@@ -45,5 +65,23 @@ export function processUploadedFile(file: Express.Multer.File): ProcessedFile {
     mimeType: effectiveMimeType,
     dataUri,
     isText: false,
+    originalName: file.originalname,
   };
+}
+
+/**
+ * Process multiple uploaded files.
+ */
+export function processUploadedFiles(files: Express.Multer.File[]): ProcessedFile[] {
+  return files.map((file) => processUploadedFile(file));
+}
+
+/**
+ * Validate that a file is a supported type.
+ */
+export function validateFileType(file: Express.Multer.File): boolean {
+  const mimeOk = SUPPORTED_MIME_TYPES.has(file.mimetype);
+  const extOk =
+    file.originalname.match(/\.(jpg|jpeg|png|webp|gif|pdf|txt|md|json)$/i) !== null;
+  return mimeOk || extOk;
 }
