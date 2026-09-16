@@ -24,6 +24,8 @@ import {
 } from '../schemas/vision.schema.js';
 import { ProcessedFile } from '../utils/fileProcessing.js';
 
+import { extractJson } from '../utils/jsonExtractor.js';
+
 type VisionResult =
   | { type: 'document_type'; data: DocumentTypeResult }
   | { type: 'timetable'; data: TimetableExtraction }
@@ -75,7 +77,7 @@ export class VisionService {
     const userContent = this.buildImageContent(userText, files);
 
     const messages: ChatCompletionMessage[] = [
-      { role: 'system', content: systemPrompt },
+      { role: 'system', content: systemPrompt + '\n\nIMPORTANT: Return valid JSON only. Do not include introductory text or unformatted chat commentary.' },
       { role: 'user', content: userContent },
     ];
 
@@ -85,6 +87,7 @@ export class VisionService {
       model: config.openrouter.visionModel,
       messages,
       response_format: { type: 'json_object' },
+      max_tokens: 3500,
       temperature: 0.1,
     });
 
@@ -99,7 +102,7 @@ export class VisionService {
         : JSON.stringify(choice.message.content);
 
     try {
-      return JSON.parse(contentText);
+      return extractJson(contentText);
     } catch (e) {
       console.error('[VisionService] Failed to parse vision model JSON output:', contentText);
       throw new Error('Vision model did not return valid JSON. The image may be unreadable.');

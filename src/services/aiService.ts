@@ -5,7 +5,11 @@ import {
   ExtractionPreview,
 } from '../types/studyvault';
 
-const AI_API_BASE = import.meta.env.VITE_AI_API_URL || 'http://localhost:5001/api/ai';
+const AI_API_BASE =
+  import.meta.env.VITE_AI_API_URL ||
+  (typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+    ? '/api/ai'
+    : 'http://localhost:5001/api/ai');
 
 export interface ChatServiceResponse {
   replyText: string;

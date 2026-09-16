@@ -32,6 +32,14 @@ export function handleControllerError(res: Response, error: any, contextMsg: str
     });
   }
 
+  if (errorMessage.includes('402') || errorMessage.includes('Insufficient credits')) {
+    return res.status(402).json({
+      error: 'Insufficient OpenRouter Credits',
+      message:
+        'Your OpenRouter account has 0 credits. Add credits at https://openrouter.ai/settings/credits or configure free models.',
+    });
+  }
+
   return res.status(500).json({
     error: 'AI Processing Error',
     message: errorMessage,

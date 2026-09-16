@@ -11,11 +11,5 @@
       "maxDuration": 60,
       "memory": 1024
     }
-  },
-  "env": {
-    "OPENROUTER_API_KEY": "@openrouter_api_key",
-    "OPENROUTER_CHAT_MODEL": "google/gemini-2.5-flash",
-    "OPENROUTER_VISION_MODEL": "google/gemini-2.5-flash",
-    "BACKEND_MODE": "mock"
   }
 }
