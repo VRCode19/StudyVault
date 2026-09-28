@@ -27,9 +27,9 @@ export async function handleChat(req: Request, res: Response) {
 
     const authHeader = req.headers.authorization;
 
-    // Process any uploaded images
+    // Process any uploaded images/documents
     const files = req.files as Express.Multer.File[] | undefined;
-    const processedFiles = files && files.length > 0 ? processUploadedFiles(files) : undefined;
+    const processedFiles = files && files.length > 0 ? await processUploadedFiles(files) : undefined;
 
     const result = await chatService.processMessage(
       validatedData.message,

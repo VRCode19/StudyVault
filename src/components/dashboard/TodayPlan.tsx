@@ -7,13 +7,12 @@ import {
   Scissors,
   CalendarDays,
   ChevronRight,
-  MoreVertical,
 } from 'lucide-react';
 import { useStudyVault } from '../../context/StudyVaultContext';
 import { GlassCard } from '../common/GlassCard';
 import { Badge } from '../common/Badge';
 import { Button } from '../common/Button';
-import { StudySession } from '../../types/studyvault';
+import { DayOfWeek } from '../../types/studyvault';
 
 export const TodayPlan: React.FC = () => {
   const {
@@ -21,10 +20,17 @@ export const TodayPlan: React.FC = () => {
     toggleSessionComplete,
     splitSession,
     setSelectedSession,
+    setActivePage,
   } = useStudyVault();
 
-  // Filter today's sessions (Friday / current day)
-  const todaySessions = sessions.filter((s) => s.dayOfWeek === 'FRI');
+  // Compute actual current day of week and formatted date string
+  const dayOfWeekMap: DayOfWeek[] = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+  const now = new Date();
+  const currentDay = dayOfWeekMap[now.getDay()];
+  const todayFormatted = now.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+
+  // Filter today's sessions, or fallback to first available day if empty and user wants to preview
+  const todaySessions = sessions.filter((s) => s.dayOfWeek === currentDay);
 
   const completedCount = todaySessions.filter((s) => s.status === 'completed').length;
   const totalCount = todaySessions.length;
@@ -40,11 +46,13 @@ export const TodayPlan: React.FC = () => {
               Today's plan
             </h2>
             <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/25">
-              Friday • Sep 11
+              {todayFormatted}
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            {completedCount} of {totalCount} sessions completed ({percentage}%)
+            {totalCount === 0
+              ? 'No sessions scheduled for today.'
+              : `${completedCount} of ${totalCount} sessions completed (${percentage}%)`}
           </p>
         </div>
 
@@ -62,9 +70,38 @@ export const TodayPlan: React.FC = () => {
         </div>
       </div>
 
-      {/* Task list */}
+      {/* Task list or empty state */}
       <div className="mt-5 space-y-3">
-        {todaySessions.map((session) => {
+        {todaySessions.length === 0 ? (
+          <div className="py-8 px-4 text-center rounded-xl bg-white/[0.02] border border-white/[0.05] space-y-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center mx-auto">
+              <CalendarDays className="w-5 h-5" />
+            </div>
+            <div className="space-y-1">
+              <h4 className="text-sm font-semibold text-white">No Study Blocks Scheduled for Today</h4>
+              <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                Your syllabus topics will appear here when scheduled, or you can check your weekly timetable.
+              </p>
+            </div>
+            <div className="flex items-center justify-center gap-3 pt-2">
+              <Button
+                variant="glass"
+                size="sm"
+                onClick={() => setActivePage('schedule')}
+              >
+                Open Calendar
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setActivePage('syllabus')}
+              >
+                Go to Syllabus
+              </Button>
+            </div>
+          </div>
+        ) : (
+          todaySessions.map((session) => {
           const isDone = session.status === 'completed';
 
           return (
@@ -168,7 +205,8 @@ export const TodayPlan: React.FC = () => {
               </div>
             </div>
           );
-        })}
+        })
+        )}
       </div>
     </GlassCard>
   );

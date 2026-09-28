@@ -10,6 +10,7 @@ import { conversationService } from './conversation.service.js';
 import { visionService } from './vision.service.js';
 import { ProcessedFile } from '../utils/fileProcessing.js';
 import { config } from '../config/env.config.js';
+import { synthesizeStudySessionsFromSubjects } from '../utils/timetableSynthesis.js';
 
 export class ChatService {
   async processMessage(
@@ -20,18 +21,64 @@ export class ChatService {
     imageFiles?: ProcessedFile[]
   ): Promise<ChatResponse> {
     const convId = conversationId || 'default';
+    const trimmedMsg = userMessage.trim();
+    let onboardingState = conversationService.getOnboardingState(convId);
 
-    // 1. If images were uploaded, analyze them first
+    // 1. Detect onboarding triggers & subject count from user message
+    const isPlanningRequest =
+      /set\s*up|start|create\s*(?:my\s*)?timetable|arrange\s*(?:my\s*)?module|plan\s*(?:my\s*)?study|how\s*many\s*subject|syllabus|subject/i.test(
+        trimmedMsg
+      );
+
+    if (!onboardingState.active && isPlanningRequest) {
+      conversationService.startSubjectOnboarding(convId);
+      onboardingState = conversationService.getOnboardingState(convId);
+    }
+
+    // Check if user is specifying subject count (e.g. "3", "3 subjects", "I have 4 subjects", "five")
+    const wordNumbers: Record<string, number> = {
+      one: 1,
+      two: 2,
+      three: 3,
+      four: 4,
+      five: 5,
+      six: 6,
+      seven: 7,
+      eight: 8,
+      nine: 9,
+      ten: 10,
+    };
+    const digitMatch = trimmedMsg.match(/\b([1-9]|10)\b(?:\s*(?:subjects?|courses?|classes?))?/i);
+    const wordMatch = trimmedMsg.match(
+      /\b(one|two|three|four|five|six|seven|eight|nine|ten)\b(?:\s*(?:subjects?|courses?|classes?))?/i
+    );
+
+    let detectedCount: number | null = null;
+    if (digitMatch) {
+      detectedCount = parseInt(digitMatch[1], 10);
+    } else if (wordMatch) {
+      detectedCount = wordNumbers[wordMatch[1].toLowerCase()];
+    }
+
+    if (
+      detectedCount &&
+      (!onboardingState.totalSubjects || onboardingState.step === 'ASK_SUBJECT_COUNT')
+    ) {
+      conversationService.setTotalSubjects(convId, detectedCount);
+      onboardingState = conversationService.getOnboardingState(convId);
+    }
+
+    // 2. If images were uploaded, analyze them first
     let imageAnalysisContext = '';
     let extractionData: any = null;
 
     if (imageFiles && imageFiles.length > 0) {
       try {
-        console.log(`[ChatService] Processing ${imageFiles.length} uploaded image(s) for conversation ${convId}`);
+        console.log(`[ChatService] Processing ${imageFiles.length} uploaded file(s) for conversation ${convId}`);
         const visionResult = await visionService.analyzeImage(imageFiles);
 
         extractionData = visionResult;
-        imageAnalysisContext = `\n\n[SYSTEM: The user uploaded ${imageFiles.length} image(s). The vision system analyzed them and returned the following extraction result. Use this data to respond to the user. Do NOT re-analyze — the analysis is already done.]\n\nExtraction Result:\n${JSON.stringify(visionResult, null, 2)}`;
+        imageAnalysisContext = `\n\n[SYSTEM: The user uploaded ${imageFiles.length} file(s). The vision/document system analyzed them and returned the following extraction result. Use this data to respond to the user. Do NOT re-analyze — the analysis is already done.]\n\nExtraction Result:\n${JSON.stringify(visionResult, null, 2)}`;
 
         // Track in conversation context
         conversationService.setPendingExtraction(convId, visionResult.type, visionResult.data);
@@ -43,20 +90,61 @@ export class ChatService {
           conversationService.updateOnboarding(convId, { examTimetableUploaded: true });
         } else if (visionResult.type === 'syllabus') {
           conversationService.updateOnboarding(convId, { syllabusUploaded: true });
+
+          // Record in sequential multi-subject collector
+          if (visionResult.data?.subjects && visionResult.data.subjects.length > 0) {
+            for (const sub of visionResult.data.subjects) {
+              conversationService.addCollectedSubject(convId, {
+                name: sub.name,
+                code: sub.code,
+                modules:
+                  sub.modules && sub.modules.length > 0
+                    ? sub.modules.map((m: any, idx: number) => ({
+                        moduleNumber: m.moduleNumber || m.number || idx + 1,
+                        title: m.title || m.name || `Module ${idx + 1}`,
+                        topics: Array.isArray(m.topics)
+                          ? m.topics.map((t: any) => ({
+                              name: typeof t === 'string' ? t : t.name,
+                              estimatedMinutes: typeof t === 'object' ? t.estimatedMinutes : 45,
+                              difficulty:
+                                typeof t === 'object' && ['easy', 'medium', 'hard'].includes(t.difficulty)
+                                  ? t.difficulty
+                                  : 'medium',
+                            }))
+                          : [],
+                      }))
+                    : sub.topics && sub.topics.length > 0
+                    ? [
+                        {
+                          moduleNumber: 1,
+                          title: 'Core Curriculum',
+                          topics: sub.topics.map((t: any) => ({
+                            name: typeof t === 'string' ? t : t.name,
+                            estimatedMinutes: typeof t === 'object' ? t.estimatedMinutes : 45,
+                            difficulty:
+                              typeof t === 'object' && ['easy', 'medium', 'hard'].includes(t.difficulty)
+                                ? t.difficulty
+                                : 'medium',
+                          })),
+                        },
+                      ]
+                    : [],
+              });
+            }
+            onboardingState = conversationService.getOnboardingState(convId);
+          }
         }
       } catch (err: any) {
-        console.error('[ChatService] Vision analysis failed:', err);
-        imageAnalysisContext = `\n\n[SYSTEM: The user uploaded image(s) but analysis failed: ${err.message}. Inform the user and ask them to try again with a clearer image.]`;
+        console.error('[ChatService] Document/Image analysis failed:', err);
+        imageAnalysisContext = `\n\n[SYSTEM: The user uploaded file(s) but analysis failed: ${err.message}. Inform the user and ask them to try again with a clearer image or document.]`;
       }
     }
 
-    // 2. Get conversation context summary
+    // 3. Get conversation context summary for system prompt
     const contextSummary = conversationService.getContextSummary(convId);
-    const contextNote = contextSummary
-      ? `\n[SYSTEM CONTEXT: ${contextSummary}]`
-      : '';
+    const contextNote = contextSummary ? `\n[SYSTEM CONTEXT: ${contextSummary}]` : '';
 
-    // 3. Build message list
+    // 4. Build message list
     const recentHistory = history.slice(-12); // Sliding window: last 12 turns
 
     const messages: ChatCompletionMessage[] = [
@@ -77,21 +165,30 @@ export class ChatService {
     const toolsUsed: string[] = [];
     let pendingProposal: ActionCardProposal | undefined = undefined;
     let actions: Array<{ type: string; status: string; details?: any }> = [];
-    const MAX_TOOL_TURNS = 6;
+    const MAX_TOOL_TURNS = 3;
 
-    // 4. Autonomous multi-turn tool calling loop
+    // 5. Autonomous multi-turn tool calling loop
     for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
-      const response = await openRouterClient.createChatCompletion({
-        model: config.openrouter.chatModel,
-        messages,
-        tools: AI_TOOLS,
-        tool_choice: 'auto',
-        temperature: 0.2,
-      });
+      let response: any = null;
+      try {
+        response = await openRouterClient.createChatCompletion({
+          model: config.openrouter.chatModel,
+          messages,
+          tools: AI_TOOLS,
+          tool_choice: 'auto',
+          temperature: 0.2,
+          timeoutMs: 15000,
+          maxFallbacks: 3,
+        });
+      } catch (chatError: any) {
+        console.warn(`[ChatService] OpenRouter call failed on turn ${turn}:`, chatError.message);
+        break; // Exit tool loop to synthesize response from tool execution outputs / extraction
+      }
 
-      const choice = response.choices?.[0];
-      if (!choice) {
-        throw new Error('OpenRouter returned an empty response with no choices.');
+      const choice = response?.choices?.[0];
+      if (!choice || !choice.message) {
+        console.warn(`[ChatService] OpenRouter returned no choices on turn ${turn}. Breaking tool loop.`);
+        break;
       }
 
       const assistantMessage = choice.message;
@@ -148,6 +245,34 @@ export class ChatService {
           ? assistantMessage.content
           : JSON.stringify(assistantMessage.content);
 
+      // If all subjects collected and no action proposal created yet, synthesize master timetable
+      const currentOnboarding = conversationService.getOnboardingState(convId);
+      if (
+        currentOnboarding.active &&
+        currentOnboarding.step === 'ALL_COLLECTED' &&
+        currentOnboarding.collectedSubjects.length > 0 &&
+        !pendingProposal
+      ) {
+        const synthesized = synthesizeStudySessionsFromSubjects(currentOnboarding.collectedSubjects);
+        pendingProposal = {
+          type: 'schedule-proposal',
+          title: `Master Study Timetable (${currentOnboarding.collectedSubjects.length} Subjects)`,
+          description: `Balanced ${synthesized.studySessions.length} weekly sessions across Monday–Sunday, distributed by topic difficulty into prime focus blocks.`,
+          totalHours: Math.round(
+            synthesized.studySessions.reduce((acc, s) => acc + (s.durationMinutes || 45), 0) / 60
+          ),
+          sessionsCount: synthesized.studySessions.length,
+          sessions: synthesized.studySessions.map((s) => ({
+            day: s.dayOfWeek,
+            subject: s.subjectName,
+            topic: s.topicName,
+            time: `${s.startTime} - ${s.endTime}`,
+            duration: s.durationMinutes,
+          })),
+          applied: false,
+        };
+      }
+
       return {
         replyText: replyText || "I've analyzed your request.",
         actionCard: pendingProposal,
@@ -157,16 +282,96 @@ export class ChatService {
       };
     }
 
-    // If max turns reached, return latest generated response
-    const lastAssistant = messages.filter((m) => m.role === 'assistant').pop();
-    const fallbackText = lastAssistant?.content
-      ? typeof lastAssistant.content === 'string'
-        ? lastAssistant.content
-        : JSON.stringify(lastAssistant.content)
-      : "I've compiled your schedule details and verified your deadlines.";
+    // 6. Resilient Fallback / Synthesis if tool loop ended or model response was empty
+    let replyText = '';
+    const lastAssistant = messages.filter((m) => m.role === 'assistant' && m.content).pop();
+    if (lastAssistant && lastAssistant.content) {
+      replyText =
+        typeof lastAssistant.content === 'string'
+          ? lastAssistant.content
+          : JSON.stringify(lastAssistant.content);
+    }
+
+    const finalOnboarding = conversationService.getOnboardingState(convId);
+
+    // If all subjects are collected, synthesize the master timetable into the calendar
+    if (
+      finalOnboarding.active &&
+      (finalOnboarding.step === 'ALL_COLLECTED' ||
+        finalOnboarding.collectedSubjects.length >= (finalOnboarding.totalSubjects || 1)) &&
+      finalOnboarding.collectedSubjects.length > 0
+    ) {
+      const synthesized = synthesizeStudySessionsFromSubjects(finalOnboarding.collectedSubjects);
+      if (!pendingProposal) {
+        pendingProposal = {
+          type: 'schedule-proposal',
+          title: `Master Study Timetable (${finalOnboarding.collectedSubjects.length} Subjects)`,
+          description: `Balanced ${synthesized.studySessions.length} weekly sessions across Monday–Sunday, distributed by topic difficulty into prime focus blocks.`,
+          totalHours: Math.round(
+            synthesized.studySessions.reduce((acc, s) => acc + (s.durationMinutes || 45), 0) / 60
+          ),
+          sessionsCount: synthesized.studySessions.length,
+          sessions: synthesized.studySessions.map((s) => ({
+            day: s.dayOfWeek,
+            subject: s.subjectName,
+            topic: s.topicName,
+            time: `${s.startTime} - ${s.endTime}`,
+            duration: s.durationMinutes,
+          })),
+          applied: false,
+        };
+      }
+
+      if (!replyText || replyText.trim().length < 15) {
+        const subList = finalOnboarding.collectedSubjects.map((s) => `**${s.name}**`).join(', ');
+        replyText =
+          `🎉 **All ${finalOnboarding.collectedSubjects.length} subjects have been gathered!** (${subList})\n\n` +
+          `I have organized all your modules across Monday to Sunday into a balanced weekly timetable in your calendar:\n\n` +
+          `• 🧠 **High-complexity topics** are assigned to morning focus blocks for maximum retention.\n` +
+          `• 🔄 **Subjects are alternated across the week** to maintain cognitive momentum without burnout.\n` +
+          `• 📅 Total **${synthesized.studySessions.length} focus sessions** prepared.\n\n` +
+          `Click **'Lock In Schedule'** below to sync these sessions directly into your calendar!`;
+      }
+    } else if (finalOnboarding.active && finalOnboarding.step === 'COLLECT_SUBJECT_SYLLABUS') {
+      const nextNum = finalOnboarding.currentSubjectIndex + 1;
+      const total = finalOnboarding.totalSubjects || '?';
+      const justExtracted = extractionData?.data?.subjects?.[0];
+
+      if (!replyText || replyText.trim().length < 15) {
+        if (justExtracted) {
+          replyText =
+            `✅ I have successfully analyzed the syllabus for **${justExtracted.name}** (${justExtracted.code || ''}) and extracted **${justExtracted.modules?.length || 0} modules**!\n\n` +
+            `Now let's move to **Subject ${nextNum} of ${total}**:\n` +
+            `What is the name of Subject ${nextNum}, and could you upload or paste its syllabus?`;
+        } else {
+          replyText =
+            `Great! You have **${total} subjects** this semester.\n\n` +
+            `Let's set them up one by one so I can organize every module properly into your calendar.\n\n` +
+            `👉 **Subject ${nextNum} of ${total}**: What is the name of this subject, and please upload or paste its syllabus (document, image, or topics list).`;
+        }
+      }
+    } else if (finalOnboarding.active && finalOnboarding.step === 'ASK_SUBJECT_COUNT') {
+      if (!replyText || replyText.trim().length < 15) {
+        replyText =
+          `Welcome to StudyVault! To arrange every module into your calendar in a balanced, realistic schedule:\n\n` +
+          `👉 **How many subjects are you studying this semester?** (e.g., 3, 4, 5...)\n\n` +
+          `Once you reply with the number, we'll go through them one by one: Subject 1 syllabus, then Subject 2 syllabus, etc.!`;
+      }
+    } else if (!replyText || replyText.trim().length < 5) {
+      if (extractionData && extractionData.type === 'timetable') {
+        replyText = `I've successfully extracted your class timetable! Your weekly classes have been synced to your study plan.`;
+      } else if (extractionData && extractionData.type === 'exam_timetable') {
+        replyText = `I've extracted your exam schedule and synchronized your countdown deadlines.`;
+      } else {
+        replyText =
+          `I am StudyVault AI, your personal academic strategist.\n\n` +
+          `To build your personalized study schedule and arrange every module into your calendar:\n\n` +
+          `👉 **How many subjects are you studying this semester?** (e.g., 3, 4, 5...)`;
+      }
+    }
 
     return {
-      replyText: fallbackText,
+      replyText,
       actionCard: pendingProposal,
       toolsUsed: Array.from(new Set(toolsUsed)),
       actions: actions.length > 0 ? actions : undefined,

@@ -83,8 +83,9 @@ CRITICAL RULES:
 4. Preserve subject names exactly as written.
 5. If the image is unreadable, return exams=[] with warnings.`;
 
-export const SYLLABUS_EXTRACTION_PROMPT = `You are StudyVault's Syllabus Analyzer.
-Analyze the provided syllabus/curriculum image(s) and extract structured academic data.
+export const SYLLABUS_EXTRACTION_PROMPT = `You are StudyVault's Syllabus & Timetable Synthesis Engine.
+Analyze the provided syllabus, curriculum, lecture plan, or academic document (image, PDF, doc/docx, or text).
+Extract structured course data AND synthesize an adaptive weekly study timetable according to the syllabus topics and difficulty.
 
 Return ONLY a JSON object:
 {
@@ -119,19 +120,29 @@ Return ONLY a JSON object:
       "module_count_detected": true
     }
   ],
+  "studySessions": [
+    {
+      "dayOfWeek": "MON",
+      "startTime": "09:00",
+      "endTime": "09:45",
+      "durationMinutes": 45,
+      "subjectName": "Subject Name",
+      "topicName": "Topic name",
+      "difficulty": "hard",
+      "adaptiveReason": "Prime morning focus block for high cognitive load module"
+    }
+  ],
   "needs_module_count": false,
   "module_count_question": "if needs_module_count is true, the question to ask"
 }
 
-CRITICAL ZERO-GUESSING RULES:
-1. NEVER INVENT data. Only extract what is clearly readable.
-2. If the document is unreadable/blurry/not academic: status="unreadable", subjects=[].
+CRITICAL RULES:
+1. NEVER INVENT topics not grounded in the document. Only extract what is clearly readable.
+2. If the document is unreadable/blurry/not academic: status="unreadable", subjects=[], studySessions=[].
 3. If only partially readable: status="ambiguous", extract only clear parts.
-4. If module structure is NOT clear (topics listed without module grouping): set module_count_detected=false and needs_module_count=true. Put all topics in a flat "topics" array on the subject instead of "modules".
-5. Estimate difficulty based on academic cognitive weight: foundational concepts = easy, applied/analytical = medium, complex/abstract = hard.
-6. Estimate study minutes: 15–120 per topic (standard: 45).
-7. If multiple pages are provided, combine them. Detect continuation between pages. Avoid duplicate topics.
-8. Keep each subject's topics completely separate — never mix subjects.`;
+4. Estimate difficulty based on academic cognitive weight: foundational = easy, applied = medium, abstract/complex = hard.
+5. Generate a balanced weekly study timetable ('studySessions') across MON through SUN allocating extracted topics into realistic daily focus blocks (e.g., 09:00-09:45, 11:00-11:45, 14:30-15:15, 16:30-17:15, 19:00-19:45). Place harder topics in prime morning focus blocks.
+6. If the document also contains an explicit class or lecture timetable, extract those lecture hours as well.`;
 
 export const MODULE_EXTRACTION_PROMPT = `You are StudyVault's Module Detail Extractor.
 Analyze the provided image(s) showing module-specific content and extract topics.

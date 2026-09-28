@@ -46,7 +46,15 @@ export const ImageAttachment: React.FC<ImageAttachmentProps> = ({
             )}
           </div>
         ) : (
-          <div className="w-12 h-12 rounded-lg bg-blue-600/20 border border-blue-500/30 flex items-center justify-center shrink-0 text-cyan-400">
+          <div
+            className={`w-12 h-12 rounded-lg flex items-center justify-center shrink-0 ${
+              attachment.type === 'doc'
+                ? 'bg-indigo-600/20 border border-indigo-500/40 text-indigo-300'
+                : attachment.type === 'pdf'
+                ? 'bg-rose-600/20 border border-rose-500/40 text-rose-300'
+                : 'bg-blue-600/20 border border-blue-500/30 text-cyan-400'
+            }`}
+          >
             <FileText className="w-5 h-5" />
           </div>
         )}

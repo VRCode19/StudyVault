@@ -21,12 +21,15 @@ import { GlassCard } from '../components/common/GlassCard';
 import { ProgressRing } from '../components/progress/ProgressRing';
 
 export const LandingPage: React.FC = () => {
-  const { setActivePage, stats } = useStudyVault();
+  const { setActivePage, isAuthenticated } = useStudyVault();
 
   return (
-    <div className="min-h-screen bg-[#07080b] text-slate-100 relative overflow-hidden selection:bg-blue-600/30">
+    <div className="min-h-screen liquid-bg-atmosphere text-slate-100 relative overflow-hidden selection:bg-blue-600/30">
       {/* Background ambient lighting */}
-      <div className="pointer-events-none fixed inset-0 ambient-hero-mesh" />
+      <div className="pointer-events-none fixed inset-0 z-0">
+        <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-blue-600/10 rounded-full blur-[140px]" />
+        <div className="absolute top-1/3 right-10 w-[500px] h-[500px] bg-cyan-500/10 rounded-full blur-[130px]" />
+      </div>
 
       {/* Navigation bar */}
       <header className="relative z-20 max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
@@ -58,14 +61,14 @@ export const LandingPage: React.FC = () => {
           <Button
             variant="glass"
             size="sm"
-            onClick={() => setActivePage('dashboard')}
+            onClick={() => setActivePage('login')}
           >
             Sign In
           </Button>
           <Button
             variant="primary"
             size="sm"
-            onClick={() => setActivePage('dashboard')}
+            onClick={() => setActivePage(isAuthenticated ? 'dashboard' : 'login')}
             icon={<ArrowRight className="w-3.5 h-3.5" />}
             iconPosition="right"
           >
@@ -100,7 +103,7 @@ export const LandingPage: React.FC = () => {
           <Button
             variant="primary"
             size="lg"
-            onClick={() => setActivePage('syllabus')}
+            onClick={() => setActivePage(isAuthenticated ? 'syllabus' : 'login')}
             icon={<ArrowRight className="w-4 h-4" />}
             iconPosition="right"
             className="shadow-blue-glow-lg text-sm sm:text-base px-7 py-3.5"
@@ -353,7 +356,7 @@ export const LandingPage: React.FC = () => {
             <Button
               variant="glow"
               size="lg"
-              onClick={() => setActivePage('dashboard')}
+              onClick={() => setActivePage(isAuthenticated ? 'dashboard' : 'login')}
               icon={<ArrowRight className="w-4 h-4" />}
               iconPosition="right"
               className="px-8 py-3.5 text-base"

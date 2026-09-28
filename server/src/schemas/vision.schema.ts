@@ -94,6 +94,35 @@ export const SyllabusSubjectSchema = z.object({
   module_count_detected: z.boolean().optional(),
 });
 
+export const StudySessionExtractionSchema = z.object({
+  id: z.string().optional(),
+  dayOfWeek: z.enum(['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']),
+  startTime: z.string(),
+  endTime: z.string(),
+  durationMinutes: z.number().int().min(10).max(240).default(45),
+  subjectName: z.string(),
+  topicName: z.string(),
+  difficulty: z.enum(['easy', 'medium', 'hard']).optional(),
+  adaptiveReason: z.string().optional(),
+});
+
+export const SyllabusTimetableSlotSchema = z.object({
+  day: z.string(),
+  timeSlot: z.string(),
+  subject: z.string(),
+  room: z.string().optional(),
+  type: z.string().optional(),
+});
+
+export const SyllabusTimetableSchema = z.object({
+  weeklySchedule: z.array(
+    z.object({
+      day: z.string(),
+      slots: z.array(SyllabusTimetableSlotSchema),
+    })
+  ),
+});
+
 export const SyllabusExtractionSchema = z.object({
   document_type: z.literal('syllabus'),
   status: z.enum(['success', 'unreadable', 'ambiguous']),
@@ -104,6 +133,9 @@ export const SyllabusExtractionSchema = z.object({
   institution: z.string().optional(),
   term: z.string().optional(),
   subjects: z.array(SyllabusSubjectSchema).default([]),
+  // Recommended adaptive study timetable generated from syllabus
+  studySessions: z.array(StudySessionExtractionSchema).optional(),
+  timetable: SyllabusTimetableSchema.optional(),
   // Flag: AI could not determine module count
   needs_module_count: z.boolean().optional(),
   module_count_question: z.string().optional(),
@@ -148,5 +180,7 @@ export type SyllabusTopic = z.infer<typeof SyllabusTopicSchema>;
 export type SyllabusModule = z.infer<typeof SyllabusModuleSchema>;
 export type SyllabusSubject = z.infer<typeof SyllabusSubjectSchema>;
 export type SyllabusExtraction = z.infer<typeof SyllabusExtractionSchema>;
+export type StudySessionExtraction = z.infer<typeof StudySessionExtractionSchema>;
+export type SyllabusTimetable = z.infer<typeof SyllabusTimetableSchema>;
 export type ModuleExtraction = z.infer<typeof ModuleExtractionSchema>;
 export type SyllabusAnalysisResponse = z.infer<typeof SyllabusAnalysisResponseSchema>;

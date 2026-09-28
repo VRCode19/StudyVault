@@ -1,20 +1,7 @@
 import { getBackendAdapter } from '../adapters/index.js';
+import { ActionCard } from '../schemas/chat.schema.js';
 
-export interface ActionCardProposal {
-  type: 'schedule-update';
-  title: string;
-  originalSummary: string;
-  updatedSummary: string;
-  shifts: Array<{
-    sessionId: string;
-    subject: string;
-    from: string;
-    to: string;
-    duration: string;
-  }>;
-  deadlineProtected: boolean;
-  applied: boolean;
-}
+export type ActionCardProposal = ActionCard;
 
 export async function executeToolCall(
   name: string,

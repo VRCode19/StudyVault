@@ -10,11 +10,11 @@ export async function handleAnalyzeSyllabus(req: Request, res: Response) {
     // Handle single file (from multer.single)
     let processedFiles = [];
     if (req.file) {
-      processedFiles.push(processUploadedFile(req.file));
+      processedFiles.push(await processUploadedFile(req.file));
     }
     // Handle multiple files (from multer.array)
     if (req.files && Array.isArray(req.files) && req.files.length > 0) {
-      processedFiles = processUploadedFiles(req.files as Express.Multer.File[]);
+      processedFiles = await processUploadedFiles(req.files as Express.Multer.File[]);
     }
 
     // Handle raw text input

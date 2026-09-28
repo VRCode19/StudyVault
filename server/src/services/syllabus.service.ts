@@ -8,6 +8,8 @@ import {
   SyllabusAnalysisResponseSchema,
 } from '../schemas/syllabus.schema.js';
 import { ProcessedFile } from '../utils/fileProcessing.js';
+import { synthesizeStudySessionsFromSubjects } from '../utils/timetableSynthesis.js';
+import { extractSyllabusFromTextHeuristic } from '../utils/syllabusHeuristicParser.js';
 
 export class SyllabusService {
   async analyzeSyllabus(options: {
@@ -60,14 +62,29 @@ export class SyllabusService {
 
     console.log('[SyllabusService] Sending document to OpenRouter multimodal analyzer...');
 
-    const response = await openRouterClient.createChatCompletion({
-      messages,
-      response_format: { type: 'json_object' },
-      temperature: 0.1, // Near-zero temperature for structured precision
-    });
+    let response: any;
+    try {
+      response = await openRouterClient.createChatCompletion({
+        messages,
+        response_format: { type: 'json_object' },
+        temperature: 0.1, // Near-zero temperature for structured precision
+      });
+    } catch (apiError: any) {
+      console.warn('[SyllabusService] OpenRouter API error:', apiError.message);
+      const textToAnalyze = rawText || processedFile?.textContent || '';
+      if (textToAnalyze.trim().length > 30) {
+        console.log('[SyllabusService] Falling back to resilient document text parser');
+        return extractSyllabusFromTextHeuristic(textToAnalyze, processedFile?.originalName);
+      }
+      throw apiError;
+    }
 
     const choice = response.choices?.[0];
     if (!choice || !choice.message.content) {
+      const textToAnalyze = rawText || processedFile?.textContent || '';
+      if (textToAnalyze.trim().length > 30) {
+        return extractSyllabusFromTextHeuristic(textToAnalyze, processedFile?.originalName);
+      }
       throw new Error('OpenRouter returned an empty response during syllabus analysis.');
     }
 
@@ -81,6 +98,10 @@ export class SyllabusService {
       parsedJson = JSON.parse(contentText);
     } catch (parseError) {
       console.error('[SyllabusService] Failed to parse model output as JSON:', contentText);
+      const textToAnalyze = rawText || processedFile?.textContent || '';
+      if (textToAnalyze.trim().length > 30) {
+        return extractSyllabusFromTextHeuristic(textToAnalyze, processedFile?.originalName);
+      }
       return {
         status: 'unreadable',
         confidence: 'low',
@@ -103,29 +124,35 @@ export class SyllabusService {
 
       // Graceful fallback if subjects array exists
       if (Array.isArray(parsedJson.subjects) && parsedJson.subjects.length > 0) {
+        const mappedSubjects = parsedJson.subjects.map((sub: any, idx: number) => ({
+          name: sub.name || `Subject ${idx + 1}`,
+          code: sub.code || `SUB${idx + 1}`,
+          description: sub.description,
+          examDate: sub.examDate,
+          topics: Array.isArray(sub.topics)
+            ? sub.topics.map((t: any, tIdx: number) => ({
+                name: t.name || `Topic ${tIdx + 1}`,
+                module: t.module || 'Module 1',
+                estimatedMinutes: typeof t.estimatedMinutes === 'number' ? t.estimatedMinutes : 45,
+                difficulty: ['easy', 'medium', 'hard'].includes(t.difficulty)
+                  ? t.difficulty
+                  : 'medium',
+                notes: t.notes,
+              }))
+            : [],
+        }));
+
+        const synthesized = synthesizeStudySessionsFromSubjects(mappedSubjects);
+
         return {
           status: 'ambiguous',
           confidence: 'medium',
           document_type: 'syllabus',
           confidenceScore: 0.6,
           rejectionReason: 'Extracted partial curriculum with non-standard fields.',
-          subjects: parsedJson.subjects.map((sub: any, idx: number) => ({
-            name: sub.name || `Subject ${idx + 1}`,
-            code: sub.code || `SUB${idx + 1}`,
-            description: sub.description,
-            examDate: sub.examDate,
-            topics: Array.isArray(sub.topics)
-              ? sub.topics.map((t: any, tIdx: number) => ({
-                  name: t.name || `Topic ${tIdx + 1}`,
-                  module: t.module || 'Module 1',
-                  estimatedMinutes: typeof t.estimatedMinutes === 'number' ? t.estimatedMinutes : 45,
-                  difficulty: ['easy', 'medium', 'hard'].includes(t.difficulty)
-                    ? t.difficulty
-                    : 'medium',
-                  notes: t.notes,
-                }))
-              : [],
-          })),
+          subjects: mappedSubjects,
+          studySessions: synthesized.studySessions,
+          timetable: synthesized.timetable,
         };
       }
 
@@ -141,7 +168,16 @@ export class SyllabusService {
       };
     }
 
-    return validationResult.data;
+    const data = validationResult.data;
+    if ((!data.studySessions || data.studySessions.length === 0) && data.subjects.length > 0) {
+      const synthesized = synthesizeStudySessionsFromSubjects(data.subjects);
+      data.studySessions = synthesized.studySessions;
+      if (!data.timetable) {
+        data.timetable = synthesized.timetable;
+      }
+    }
+
+    return data;
   }
 }
 

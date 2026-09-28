@@ -1,12 +1,17 @@
 import React, { useState } from 'react';
 import { useStudyVault } from '../../context/StudyVaultContext';
 import { GlassCard } from '../common/GlassCard';
+import { DayOfWeek } from '../../types/studyvault';
 
 export const WeeklyChart: React.FC = () => {
-  const { stats } = useStudyVault();
+  const { stats, settings } = useStudyVault();
   const [hoveredDay, setHoveredDay] = useState<string | null>(null);
 
-  const maxHours = 5.0; // scale limit for chart
+  const targetHours = settings.dailyStudyCapacityHours || 4;
+  const maxHours = Math.max(6.0, targetHours + 1.5);
+
+  const dayOfWeekMap: DayOfWeek[] = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+  const currentDay = dayOfWeekMap[new Date().getDay()];
 
   return (
     <GlassCard variant="default" rounded="lg" className="p-5 sm:p-6 space-y-4">
@@ -16,7 +21,7 @@ export const WeeklyChart: React.FC = () => {
             Study Hours This Week
           </h3>
           <p className="text-xs text-slate-400 mt-0.5">
-            Consistency analytics against your 3.5h daily target.
+            Consistency analytics against your {targetHours}h daily target.
           </p>
         </div>
 
@@ -27,7 +32,7 @@ export const WeeklyChart: React.FC = () => {
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2.5 h-0.5 bg-cyan-400/60" />
-            <span className="text-slate-400">Daily Target (3.5h)</span>
+            <span className="text-slate-400">Daily Target ({targetHours}h)</span>
           </div>
         </div>
       </div>
@@ -35,20 +40,20 @@ export const WeeklyChart: React.FC = () => {
       {/* Vertical Bar Grid */}
       <div className="pt-4 pb-2">
         <div className="h-48 flex items-end justify-between gap-2 sm:gap-4 relative">
-          {/* Target line across chart (at 3.5 / 5.0 = 70%) */}
+          {/* Target line across chart */}
           <div
             className="absolute left-0 right-0 border-b border-dashed border-cyan-400/30 z-0 pointer-events-none"
-            style={{ bottom: `${(3.5 / maxHours) * 100}%` }}
+            style={{ bottom: `${(targetHours / maxHours) * 100}%` }}
           >
             <span className="absolute right-0 -top-4 text-[10px] font-mono text-cyan-400/80">
-              3.5h target
+              {targetHours}h target
             </span>
           </div>
 
-          {stats.weeklyStudyHours.map((item) => {
+          {(stats.weeklyStudyHours || []).map((item) => {
             const heightPercent = Math.min(100, Math.round((item.hours / maxHours) * 100));
             const isHovered = hoveredDay === item.day;
-            const isTargetMet = item.hours >= item.target;
+            const isTargetMet = item.hours >= (item.target || targetHours);
 
             return (
               <div
@@ -60,7 +65,7 @@ export const WeeklyChart: React.FC = () => {
                 {/* Tooltip on hover */}
                 {isHovered && (
                   <div className="mb-2 px-2 py-1 rounded-md bg-dark-950 text-white border border-white/20 text-[11px] font-mono shadow-xl whitespace-nowrap animate-fadeIn">
-                    {item.hours} hrs ({Math.round((item.hours / item.target) * 100)}% of goal)
+                    {item.hours} hrs ({item.target > 0 ? Math.round((item.hours / item.target) * 100) : 0}% of goal)
                   </div>
                 )}
 
@@ -68,18 +73,20 @@ export const WeeklyChart: React.FC = () => {
                 <div className="w-full max-w-[38px] bg-white/[0.04] rounded-t-xl overflow-hidden p-1 flex flex-col justify-end border border-white/[0.05] group-hover:border-white/20 transition-all">
                   <div
                     className={`w-full rounded-t-lg transition-all duration-700 ${
-                      isTargetMet
+                      isTargetMet && item.hours > 0
                         ? 'bg-gradient-to-t from-blue-600 to-cyan-400 shadow-cyan-glow/20'
-                        : 'bg-gradient-to-t from-slate-700 to-blue-500/70'
+                        : item.hours > 0
+                        ? 'bg-gradient-to-t from-slate-700 to-blue-500/70'
+                        : 'bg-white/[0.02]'
                     }`}
-                    style={{ height: `${heightPercent}%` }}
+                    style={{ height: `${Math.max(4, heightPercent)}%` }}
                   />
                 </div>
 
                 {/* Day label */}
                 <span
                   className={`mt-2 text-xs font-mono font-semibold transition-colors ${
-                    item.day === 'FRI'
+                    item.day === currentDay
                       ? 'text-cyan-400'
                       : isHovered
                       ? 'text-white'

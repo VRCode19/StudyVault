@@ -37,10 +37,10 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
 
       {/* Message Content Bubble */}
       <div
-        className={`max-w-xl rounded-card-sm p-4 text-sm leading-relaxed border transition-all ${
+        className={`max-w-xl rounded-2xl p-4 sm:p-5 text-sm leading-relaxed border transition-all relative ${
           isAI
-            ? 'bg-dark-850/80 border-white/10 text-slate-200'
-            : 'bg-blue-600/30 border-blue-500/40 text-white shadow-blue-glow/20'
+            ? 'liquid-glass-2 border-white/15 text-slate-200 shadow-liquid-sm'
+            : 'bg-gradient-to-r from-blue-600/35 via-indigo-600/30 to-cyan-500/25 border-cyan-400/40 text-white shadow-liquid-sm backdrop-blur-xl'
         }`}
       >
         <div className="flex items-center justify-between gap-4 mb-1 text-[11px] font-mono text-slate-400">

@@ -21,7 +21,7 @@ export const ActionCardShiftSchema = z.object({
   duration: z.string(),
 });
 
-export const ActionCardSchema = z.object({
+export const ScheduleUpdateCardSchema = z.object({
   type: z.literal('schedule-update'),
   title: z.string(),
   originalSummary: z.string(),
@@ -30,6 +30,40 @@ export const ActionCardSchema = z.object({
   deadlineProtected: z.boolean(),
   applied: z.boolean().default(false),
 });
+
+export const ScheduleProposalCardSchema = z.object({
+  type: z.literal('schedule-proposal'),
+  title: z.string(),
+  description: z.string(),
+  totalHours: z.number(),
+  sessionsCount: z.number(),
+  sessions: z.array(
+    z.object({
+      day: z.string(),
+      subject: z.string(),
+      topic: z.string(),
+      time: z.string(),
+      duration: z.number(),
+    })
+  ),
+  applied: z.boolean().default(false),
+});
+
+export const OnboardingProgressCardSchema = z.object({
+  type: z.literal('onboarding-progress'),
+  title: z.string(),
+  step: z.string(),
+  completedSteps: z.array(z.string()),
+  pendingSteps: z.array(z.string()),
+  percentage: z.number(),
+  applied: z.boolean().optional(),
+});
+
+export const ActionCardSchema = z.union([
+  ScheduleUpdateCardSchema,
+  ScheduleProposalCardSchema,
+  OnboardingProgressCardSchema,
+]);
 
 export const ActionSchema = z.object({
   type: z.string(),

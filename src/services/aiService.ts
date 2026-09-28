@@ -3,13 +3,12 @@ import {
   ChatMessage,
   Subject,
   ExtractionPreview,
+  StudySession,
+  DayOfWeek,
+  TimetableSlotItem,
 } from '../types/studyvault';
 
-const AI_API_BASE =
-  import.meta.env.VITE_AI_API_URL ||
-  (typeof window !== 'undefined' && window.location.hostname !== 'localhost'
-    ? '/api/ai'
-    : 'http://localhost:5001/api/ai');
+const AI_API_BASE = import.meta.env.VITE_AI_API_URL || '/api/ai';
 
 export interface ChatServiceResponse {
   replyText: string;
@@ -27,12 +26,29 @@ export interface ExtractedTopic {
   notes?: string;
 }
 
+export interface ExtractedStudySession {
+  id?: string;
+  dayOfWeek: DayOfWeek;
+  startTime: string;
+  endTime: string;
+  durationMinutes: number;
+  subjectName: string;
+  topicName: string;
+  difficulty?: 'easy' | 'medium' | 'hard';
+  adaptiveReason?: string;
+}
+
 export interface ExtractedSubject {
   name: string;
   code: string;
   description?: string;
   examDate?: string;
-  topics: ExtractedTopic[];
+  topics?: ExtractedTopic[];
+  modules?: Array<{
+    number?: number;
+    title?: string;
+    topics?: ExtractedTopic[];
+  }>;
 }
 
 export interface SyllabusAnalysisResult {
@@ -43,6 +59,13 @@ export interface SyllabusAnalysisResult {
   institution?: string;
   term?: string;
   subjects: ExtractedSubject[];
+  studySessions?: ExtractedStudySession[];
+  timetable?: {
+    weeklySchedule: Array<{
+      day: string;
+      slots: TimetableSlotItem[];
+    }>;
+  };
 }
 
 export class AIService {
@@ -296,13 +319,34 @@ export class AIService {
       const subId = `sub-ai-${Date.now()}-${idx}`;
       const colorScheme = colors[idx % colors.length];
 
-      const topics = ext.topics.map((t, tIdx) => ({
+      // Extract topics from either direct topics array or nested modules array
+      const rawTopics: ExtractedTopic[] = [];
+      if (Array.isArray(ext.topics) && ext.topics.length > 0) {
+        rawTopics.push(...ext.topics);
+      } else if (Array.isArray(ext.modules)) {
+        ext.modules.forEach((mod) => {
+          const modTitle = mod.title || (mod.number ? `Module ${mod.number}` : 'Core Module');
+          if (Array.isArray(mod.topics)) {
+            mod.topics.forEach((t) => {
+              rawTopics.push({
+                name: typeof t === 'string' ? t : t.name,
+                module: (t as any).module || modTitle,
+                estimatedMinutes: t.estimatedMinutes || 45,
+                difficulty: t.difficulty || 'medium',
+                notes: t.notes,
+              });
+            });
+          }
+        });
+      }
+
+      const topics = rawTopics.map((t, tIdx) => ({
         id: `top-ai-${Date.now()}-${idx}-${tIdx}`,
         subjectId: subId,
         name: t.name,
-        module: t.module,
+        module: t.module || 'Core Module',
         estimatedMinutes: t.estimatedMinutes || 45,
-        difficulty: t.difficulty,
+        difficulty: t.difficulty || 'medium',
         status: 'pending' as const,
         notes: t.notes,
       }));
@@ -324,6 +368,112 @@ export class AIService {
         topics,
       };
     });
+  }
+
+  /**
+   * Synthesize adaptive weekly study sessions from a list of subjects and topics.
+   * Balances topic difficulty, estimated study time, and student daily preferences.
+   */
+  generateScheduleFromSubjects(
+    subjects: Subject[],
+    options?: {
+      preferredTimeOfDay?: 'morning' | 'afternoon' | 'evening';
+      dailyHours?: number;
+      excludeWeekends?: boolean;
+    }
+  ): StudySession[] {
+    const days: DayOfWeek[] = options?.excludeWeekends
+      ? ['MON', 'TUE', 'WED', 'THU', 'FRI']
+      : ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+
+    const timeSlots = [
+      { start: '09:00', end: '09:45', duration: 45, period: 'morning', label: 'Morning Deep Work' },
+      { start: '10:30', end: '11:15', duration: 45, period: 'morning', label: 'Late Morning Focus' },
+      { start: '14:00', end: '14:50', duration: 50, period: 'afternoon', label: 'Afternoon Analysis' },
+      { start: '15:30', end: '16:15', duration: 45, period: 'afternoon', label: 'Applied Practice' },
+      { start: '17:30', end: '18:15', duration: 45, period: 'evening', label: 'Twilight Consolidation' },
+      { start: '19:30', end: '20:15', duration: 45, period: 'evening', label: 'Evening Recall' },
+    ];
+
+    if (options?.preferredTimeOfDay === 'afternoon') {
+      timeSlots.sort((a, b) => (a.period === 'afternoon' ? -1 : b.period === 'afternoon' ? 1 : 0));
+    } else if (options?.preferredTimeOfDay === 'evening') {
+      timeSlots.sort((a, b) => (a.period === 'evening' ? -1 : b.period === 'evening' ? 1 : 0));
+    }
+
+    // Flatten all topics
+    const allTopics: Array<{
+      subjectId: string;
+      subjectName: string;
+      subjectColor: string;
+      topicId: string;
+      topicName: string;
+      difficulty: 'easy' | 'medium' | 'hard';
+      estimatedMinutes: number;
+    }> = [];
+
+    for (const sub of subjects) {
+      if (Array.isArray(sub.topics)) {
+        for (const t of sub.topics) {
+          allTopics.push({
+            subjectId: sub.id,
+            subjectName: sub.name,
+            subjectColor: sub.accentColor || '#3b82f6',
+            topicId: t.id,
+            topicName: t.name,
+            difficulty: t.difficulty || 'medium',
+            estimatedMinutes: t.estimatedMinutes || 45,
+          });
+        }
+      }
+    }
+
+    if (allTopics.length === 0) return [];
+
+    // Prioritize harder topics into prime focus windows
+    const hardTopics = allTopics.filter((t) => t.difficulty === 'hard');
+    const mediumTopics = allTopics.filter((t) => t.difficulty === 'medium');
+    const easyTopics = allTopics.filter((t) => t.difficulty === 'easy');
+    const orderedTopics = [...hardTopics, ...mediumTopics, ...easyTopics];
+
+    const sessions: StudySession[] = [];
+    const maxRounds = options?.dailyHours ? Math.max(1, Math.min(4, Math.round(options.dailyHours))) : 3;
+    let topicIdx = 0;
+
+    for (let round = 0; round < maxRounds && topicIdx < orderedTopics.length; round++) {
+      for (let dayIdx = 0; dayIdx < days.length; dayIdx++) {
+        if (topicIdx >= orderedTopics.length) break;
+
+        const day = days[dayIdx];
+        const slot = timeSlots[round % timeSlots.length];
+        const topic = orderedTopics[topicIdx++];
+
+        sessions.push({
+          id: `sess-vault-${Date.now()}-${dayIdx}-${topicIdx}`,
+          subjectId: topic.subjectId,
+          subjectName: topic.subjectName,
+          subjectColor: topic.subjectColor,
+          topicId: topic.topicId,
+          topicName: topic.topicName,
+          startTime: slot.start,
+          endTime: slot.end,
+          durationMinutes: topic.estimatedMinutes || slot.duration,
+          date: new Date().toISOString().split('T')[0],
+          dayOfWeek: day,
+          status: 'pending',
+          isAdaptive: true,
+          adaptiveReason: `${
+            topic.difficulty === 'hard'
+              ? 'High-difficulty syllabus module'
+              : topic.difficulty === 'easy'
+              ? 'Foundational concept review'
+              : 'Core syllabus progression'
+          } scheduled in ${slot.label}`,
+        });
+      }
+    }
+
+    return sessions;
   }
 }
 

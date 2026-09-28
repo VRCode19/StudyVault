@@ -29,7 +29,7 @@ export async function handleAnalyzeImage(req: Request, res: Response) {
       }
     }
 
-    const processedFiles = processUploadedFiles(files);
+    const processedFiles = await processUploadedFiles(files);
     console.log(`[VisionController] Analyzing ${processedFiles.length} file(s): ${files.map((f) => f.originalname).join(', ')}`);
 
     const result = await visionService.analyzeImage(processedFiles);
@@ -55,7 +55,7 @@ export async function handleAnalyzeTimetable(req: Request, res: Response) {
       });
     }
 
-    const processedFiles = processUploadedFiles(files);
+    const processedFiles = await processUploadedFiles(files);
     const result = await visionService.extractTimetable(processedFiles);
 
     return res.status(200).json(result);
@@ -79,7 +79,7 @@ export async function handleAnalyzeExamTimetable(req: Request, res: Response) {
       });
     }
 
-    const processedFiles = processUploadedFiles(files);
+    const processedFiles = await processUploadedFiles(files);
     const result = await visionService.extractExamTimetable(processedFiles);
 
     return res.status(200).json(result);

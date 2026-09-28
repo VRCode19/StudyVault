@@ -7,8 +7,6 @@ import {
   Flame,
   ShieldCheck,
   Paperclip,
-  Image as ImageIcon,
-  X,
   UploadCloud,
   FileCheck,
 } from 'lucide-react';
@@ -56,17 +54,27 @@ export const AIChat: React.FC<{ fullHeight?: boolean }> = ({ fullHeight = true }
     Array.from(files).forEach((file) => {
       // Validate type
       const isImage = file.type.startsWith('image/');
-      const isPdf = file.type === 'application/pdf';
-      const isText = file.type.startsWith('text/') || file.name.endsWith('.md');
+      const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+      const isDoc =
+        file.name.toLowerCase().endsWith('.docx') ||
+        file.name.toLowerCase().endsWith('.doc') ||
+        file.type.includes('word') ||
+        file.type.includes('officedocument');
+      const isText =
+        file.type.startsWith('text/') ||
+        file.name.endsWith('.md') ||
+        file.name.endsWith('.txt') ||
+        file.name.endsWith('.csv') ||
+        file.name.endsWith('.json');
 
-      if (!isImage && !isPdf && !isText) return;
+      if (!isImage && !isPdf && !isText && !isDoc) return;
 
       newFiles.push(file);
       newPreviews.push({
         id: `att-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
         name: file.name,
         size: file.size,
-        type: isImage ? 'image' : isPdf ? 'pdf' : 'text',
+        type: isImage ? 'image' : isPdf ? 'pdf' : isDoc ? 'doc' : 'text',
         previewUrl: isImage ? URL.createObjectURL(file) : '',
       });
     });
@@ -123,7 +131,7 @@ export const AIChat: React.FC<{ fullHeight?: boolean }> = ({ fullHeight = true }
 
   const quickPrompts = [
     {
-      label: 'Setup my study schedule from scratch',
+      label: 'Create my timetable according to my syllabus',
       icon: <Sparkles className="w-3 h-3 text-cyan-400" />,
     },
     {
@@ -145,11 +153,9 @@ export const AIChat: React.FC<{ fullHeight?: boolean }> = ({ fullHeight = true }
   ];
 
   return (
-    <GlassCard
-      variant="default"
-      rounded="lg"
-      className={`relative flex flex-col ${
-        fullHeight ? 'h-[calc(100vh-140px)] min-h-[550px]' : 'h-[500px]'
+    <div
+      className={`relative flex flex-col liquid-panel border border-white/20 shadow-liquid-modal overflow-hidden ${
+        fullHeight ? 'h-[calc(100vh-140px)] min-h-[560px]' : 'h-[500px]'
       }`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -255,7 +261,7 @@ export const AIChat: React.FC<{ fullHeight?: boolean }> = ({ fullHeight = true }
           type="file"
           ref={fileInputRef}
           multiple
-          accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,text/plain"
+          accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,text/plain,.docx,.doc,.txt,.md,.json,.csv"
           onChange={(e) => handleFileSelect(e.target.files)}
           className="hidden"
         />
@@ -267,7 +273,7 @@ export const AIChat: React.FC<{ fullHeight?: boolean }> = ({ fullHeight = true }
             disabled={isAiThinking}
             onClick={() => fileInputRef.current?.click()}
             className="p-3 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-slate-400 hover:text-cyan-300 border border-white/10 transition-colors disabled:opacity-40 shrink-0"
-            title="Attach timetable, exam datesheet, or syllabus image"
+            title="Attach timetable, exam datesheet, or syllabus document (Image, PDF, DOCX/DOC)"
             aria-label="Attach file"
           >
             <Paperclip className="w-4 h-4" />
@@ -284,7 +290,7 @@ export const AIChat: React.FC<{ fullHeight?: boolean }> = ({ fullHeight = true }
                 ? 'AI is analyzing & executing...'
                 : attachedFiles.length > 0
                 ? 'Add instructions for uploaded document (or hit send to auto-analyze)...'
-                : 'Ask Studyvault or upload timetable / syllabus images...'
+                : 'Ask Studyvault or upload syllabus / timetable (Image, PDF, DOC)...'
             }
             className="w-full pl-4 pr-12 py-3.5 rounded-xl bg-dark-950/80 text-white placeholder-slate-500 border border-white/10 focus:border-cyan-500/50 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 text-sm disabled:opacity-50"
           />
@@ -300,6 +306,6 @@ export const AIChat: React.FC<{ fullHeight?: boolean }> = ({ fullHeight = true }
           </button>
         </div>
       </form>
-    </GlassCard>
+    </div>
   );
 };

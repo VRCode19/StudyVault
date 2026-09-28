@@ -24,11 +24,11 @@ export const config = {
   openrouter: {
     apiKey: process.env.OPENROUTER_API_KEY || '',
     baseUrl: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
-    chatModel: process.env.OPENROUTER_CHAT_MODEL || process.env.OPENROUTER_MODEL || 'nex-agi/nex-n2.5-mini:free',
-    visionModel: process.env.OPENROUTER_VISION_MODEL || 'inclusionai/ling-3.0-flash-vl:free',
+    chatModel: process.env.OPENROUTER_CHAT_MODEL || process.env.OPENROUTER_MODEL || 'openrouter/free',
+    visionModel: process.env.OPENROUTER_VISION_MODEL || 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
     // Legacy fallback
-    model: process.env.OPENROUTER_CHAT_MODEL || process.env.OPENROUTER_MODEL || 'nex-agi/nex-n2.5-mini:free',
-    fallbackModel: process.env.OPENROUTER_FALLBACK_MODEL || 'nex-agi/nex-n2.5-pro:free',
+    model: process.env.OPENROUTER_CHAT_MODEL || process.env.OPENROUTER_MODEL || 'openrouter/free',
+    fallbackModel: process.env.OPENROUTER_FALLBACK_MODEL || 'liquid/lfm-2.5-2.6b:free',
   },
 
   backend: {

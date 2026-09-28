@@ -125,6 +125,17 @@ export interface ExtractionPreview {
       slots: TimetableSlotItem[];
     }[];
   };
+  studySessions?: Array<{
+    id?: string;
+    dayOfWeek: DayOfWeek;
+    startTime: string;
+    endTime: string;
+    durationMinutes: number;
+    subjectName: string;
+    topicName: string;
+    difficulty?: 'easy' | 'medium' | 'hard';
+    adaptiveReason?: string;
+  }>;
   examTimetable?: {
     exams: ExamDateItem[];
   };
@@ -188,7 +199,7 @@ export interface ChatAttachment {
   name: string;
   size: number;
   previewUrl: string;
-  type: 'image' | 'pdf' | 'text';
+  type: 'image' | 'pdf' | 'text' | 'doc';
 }
 
 export interface ChatMessage {
@@ -235,7 +246,57 @@ export interface StudySettings {
   examCountdownAlert: boolean;
   glassIntensity: 'subtle' | 'balanced' | 'high';
   accentTheme: 'electric' | 'cyan' | 'slate';
+  themeMode?: 'dark' | 'light';
   reducedMotion: boolean;
 }
 
-export type ActivePage = 'landing' | 'dashboard' | 'schedule' | 'syllabus' | 'progress' | 'assistant' | 'settings';
+export interface TaskItem {
+  id: string;
+  title: string;
+  subject: string;
+  subjectColor?: string;
+  dueDate: string; // e.g. "Today, 5:00 PM" or "Tomorrow" or "Oct 14"
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  completed: boolean;
+  tags?: string[];
+  notes?: string;
+}
+
+export interface VaultResource {
+  id: string;
+  title: string;
+  subject: string;
+  type: 'note' | 'pdf' | 'link' | 'video' | 'doc';
+  size?: string;
+  updatedAt: string;
+  content?: string; // Markdown or plain text content for the Note Viewer
+  tags?: string[];
+  bookmarked?: boolean;
+}
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  password?: string;
+  major: string;
+  semester: string;
+  targetDailyHours: number;
+  avatarUrl?: string;
+  createdAt: string;
+}
+
+export type ActivePage =
+  | 'landing'
+  | 'login'
+  | 'dashboard'
+  | 'vault'
+  | 'subjects'
+  | 'tasks'
+  | 'calendar'
+  | 'schedule'
+  | 'exams'
+  | 'progress'
+  | 'assistant'
+  | 'settings'
+  | 'syllabus';

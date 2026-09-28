@@ -15,7 +15,7 @@ import { useStudyVault } from '../../context/StudyVaultContext';
 import { GlassCard } from '../common/GlassCard';
 import { Button } from '../common/Button';
 import { Modal } from '../common/Modal';
-import { SAMPLE_SYLLABUS_TEXT } from '../../mock/demoData';
+import { SAMPLE_SYLLABUS_TEXT } from '../../constants/templates';
 
 export const SyllabusUploader: React.FC = () => {
   const { isParsingSyllabus, parsingStep, runSyllabusParser } = useStudyVault();
@@ -27,11 +27,11 @@ export const SyllabusUploader: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const parsingSteps = [
-    { title: 'Reading syllabus document & images...', icon: <FileText className="w-4 h-4" /> },
-    { title: 'Vision model identifying core subjects & modules...', icon: <Cpu className="w-4 h-4" /> },
-    { title: 'Breaking modules into structured topics...', icon: <Code className="w-4 h-4" /> },
-    { title: 'Estimating cognitive load & study time...', icon: <Sparkles className="w-4 h-4" /> },
-    { title: 'Synthesizing adaptive schedule...', icon: <CheckCircle2 className="w-4 h-4" /> },
+    { title: 'Reading syllabus document (PDF, DOCX, Image, Text)...', icon: <FileText className="w-4 h-4" /> },
+    { title: 'AI model identifying subjects, modules & difficulty...', icon: <Cpu className="w-4 h-4" /> },
+    { title: 'Structuring topics and estimating cognitive study time...', icon: <Code className="w-4 h-4" /> },
+    { title: 'Synthesizing adaptive weekly study timetable & slots...', icon: <Sparkles className="w-4 h-4" /> },
+    { title: 'Locking timetable into calendar & exam countdown...', icon: <CheckCircle2 className="w-4 h-4" /> },
   ];
 
   const handleFiles = (files: FileList | null) => {
@@ -106,8 +106,8 @@ export const SyllabusUploader: React.FC = () => {
         {isDragging && (
           <div className="absolute inset-0 z-30 flex flex-col items-center justify-center p-6 bg-dark-900/95 border-2 border-dashed border-cyan-400/80 rounded-2xl backdrop-blur-md animate-fadeIn">
             <UploadCloud className="w-16 h-16 text-cyan-400 animate-bounce mb-3" />
-            <h3 className="text-lg font-bold text-white">Drop syllabus or module files here</h3>
-            <p className="text-xs text-slate-400 mt-1">Supports images, PDF, and text documents</p>
+            <h3 className="text-lg font-bold text-white">Drop syllabus, timetable, or curriculum files here</h3>
+            <p className="text-xs text-slate-400 mt-1">Supports Images, PDF, Word (.docx, .doc), and Text</p>
           </div>
         )}
 
@@ -240,10 +240,10 @@ export const SyllabusUploader: React.FC = () => {
 
             <div className="space-y-2">
               <h2 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
-                Turn your syllabus into a study plan
+                Turn your syllabus into an adaptive study timetable
               </h2>
               <p className="text-xs sm:text-sm text-slate-400 leading-relaxed max-w-md mx-auto">
-                Upload images, PDF pages, or text outlines. Studyvault's vision engine extracts subjects and modules, estimates durations, and builds an adaptive schedule.
+                Upload images, PDF pages, or Word documents (.docx, .doc). StudyVault's AI reads your course outline, estimates module difficulty, and automatically constructs your balanced weekly timetable.
               </p>
             </div>
 
@@ -253,7 +253,7 @@ export const SyllabusUploader: React.FC = () => {
                 type="file"
                 ref={fileInputRef}
                 multiple
-                accept=".pdf,.txt,.docx,.doc,.jpg,.jpeg,.png,.webp"
+                accept=".pdf,.txt,.docx,.doc,.jpg,.jpeg,.png,.webp,.rtf,.md"
                 onChange={(e) => handleFiles(e.target.files)}
                 className="hidden"
               />
@@ -264,7 +264,7 @@ export const SyllabusUploader: React.FC = () => {
                 className="tactile-btn tactile-primary-btn px-5 py-2.5 rounded-tactile text-sm font-semibold text-white inline-flex items-center gap-2 cursor-pointer shadow-blue-glow"
               >
                 <UploadCloud className="w-4 h-4" />
-                Upload syllabus / images
+                Upload syllabus / documents
               </button>
 
               <Button
@@ -286,8 +286,11 @@ export const SyllabusUploader: React.FC = () => {
               </Button>
             </div>
 
-            <div className="pt-2 text-[11px] text-slate-500 font-mono">
-              Supported formats: Images (JPG, PNG, WebP), PDF, TXT, DOCX • Multi-page & multi-module upload supported
+            <div className="pt-2 flex flex-wrap items-center justify-center gap-2 text-[11px] font-mono">
+              <span className="px-2 py-0.5 rounded-md bg-white/[0.04] border border-white/10 text-cyan-300">Images (JPG, PNG, WebP)</span>
+              <span className="px-2 py-0.5 rounded-md bg-white/[0.04] border border-white/10 text-rose-300">PDF Documents</span>
+              <span className="px-2 py-0.5 rounded-md bg-white/[0.04] border border-white/10 text-indigo-300">Word (.DOCX / .DOC)</span>
+              <span className="px-2 py-0.5 rounded-md bg-white/[0.04] border border-white/10 text-emerald-300">Text & Markdown</span>
             </div>
           </div>
         )}

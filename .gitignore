@@ -24,6 +24,12 @@ dist-ssr
 *.sw?
 
 server/.env
+server/.env*
 .env
+.env.*
 .env.local
 .env.*.local
+*.pem
+*.key
+credentials.json
+
