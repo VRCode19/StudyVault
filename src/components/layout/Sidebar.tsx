@@ -22,9 +22,10 @@ import { ActivePage } from '../../types/studyvault';
 interface SidebarProps {
   isMobileOpen?: boolean;
   onCloseMobile?: () => void;
+  onLogoClick?: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onCloseMobile }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onCloseMobile, onLogoClick }) => {
   const { activePage, setActivePage, stats, notifications, currentUser, logout, themeMode, setThemeMode } = useStudyVault();
 
   const unreadNotifs = notifications.filter((n) => !n.read).length;
@@ -126,8 +127,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onCloseMobile })
             {/* Logo */}
             <div className="flex items-center justify-between px-2 pt-1 pb-1">
               <button
-                onClick={() => handleNavClick('dashboard')}
-                className="flex items-center gap-3 text-left group"
+                type="button"
+                id="sidebar-logo-btn"
+                onClick={() => {
+                  if (onLogoClick) onLogoClick();
+                  handleNavClick('dashboard');
+                }}
+                className="flex items-center gap-3 text-left group cursor-pointer"
               >
                 <div className="relative flex items-center justify-center w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-cyan-500 shadow-blue-glow border border-white/30 group-hover:scale-105 transition-transform duration-200">
                   <Sparkles className="w-5 h-5 text-white" />

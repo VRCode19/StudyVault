@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import { StudyVaultProvider, useStudyVault } from './context/StudyVaultContext';
 import { Sidebar } from './components/layout/Sidebar';
 import { Topbar } from './components/layout/Topbar';
@@ -6,6 +6,9 @@ import { MobileNav } from './components/layout/MobileNav';
 import { ToastContainer } from './components/common/Toast';
 import { SearchModal } from './components/common/SearchModal';
 import { SessionModal } from './components/calendar/SessionModal';
+
+// Secret Casino Vault Easter Egg (Lazy Loaded)
+import { useCasinoTrigger, CasinoGlitchEffect, CasinoVaultModal } from './features/casino-vault';
 
 // Pages
 import { LandingPage } from './pages/LandingPage';
@@ -25,12 +28,29 @@ const MainApp: React.FC = () => {
   const { activePage } = useStudyVault();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  // Secret Casino Vault Trigger Hook (Tracks 777 keystrokes, Ctrl+Shift+7, and 7 logo clicks)
+  const {
+    isGlitchActive,
+    isCasinoOpen,
+    handleGlitchComplete,
+    closeCasino,
+    handleLogoClick,
+  } = useCasinoTrigger();
+
   // If on Landing Page, render full-bleed landing view
   if (activePage === 'landing') {
     return (
       <>
-        <LandingPage />
+        <LandingPage onLogoClick={handleLogoClick} />
         <ToastContainer />
+
+        {/* Secret Casino Glitch & Modal */}
+        <CasinoGlitchEffect active={isGlitchActive} onComplete={handleGlitchComplete} />
+        {isCasinoOpen && (
+          <Suspense fallback={null}>
+            <CasinoVaultModal isOpen={isCasinoOpen} onClose={closeCasino} />
+          </Suspense>
+        )}
       </>
     );
   }
@@ -41,6 +61,14 @@ const MainApp: React.FC = () => {
       <>
         <LoginPage />
         <ToastContainer />
+
+        {/* Secret Casino Glitch & Modal */}
+        <CasinoGlitchEffect active={isGlitchActive} onComplete={handleGlitchComplete} />
+        {isCasinoOpen && (
+          <Suspense fallback={null}>
+            <CasinoVaultModal isOpen={isCasinoOpen} onClose={closeCasino} />
+          </Suspense>
+        )}
       </>
     );
   }
@@ -88,11 +116,15 @@ const MainApp: React.FC = () => {
       <Sidebar
         isMobileOpen={isMobileMenuOpen}
         onCloseMobile={() => setIsMobileMenuOpen(false)}
+        onLogoClick={handleLogoClick}
       />
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 z-10 relative">
-        <Topbar onOpenMobileMenu={() => setIsMobileMenuOpen(true)} />
+        <Topbar
+          onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
+          onLogoClick={handleLogoClick}
+        />
 
         <main className="flex-1 px-4 sm:px-6 md:px-8 max-w-7xl w-full mx-auto">
           {renderCurrentPage()}
@@ -106,6 +138,14 @@ const MainApp: React.FC = () => {
       <SearchModal />
       <SessionModal />
       <ToastContainer />
+
+      {/* Secret Casino Glitch & Modal */}
+      <CasinoGlitchEffect active={isGlitchActive} onComplete={handleGlitchComplete} />
+      {isCasinoOpen && (
+        <Suspense fallback={null}>
+          <CasinoVaultModal isOpen={isCasinoOpen} onClose={closeCasino} />
+        </Suspense>
+      )}
     </div>
   );
 };

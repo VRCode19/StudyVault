@@ -17,9 +17,10 @@ import { GlassIconButton } from '../common/GlassIconButton';
 
 interface TopbarProps {
   onOpenMobileMenu?: () => void;
+  onLogoClick?: () => void;
 }
 
-export const Topbar: React.FC<TopbarProps> = ({ onOpenMobileMenu }) => {
+export const Topbar: React.FC<TopbarProps> = ({ onOpenMobileMenu, onLogoClick }) => {
   const {
     currentUser,
     logout,
@@ -66,10 +67,16 @@ export const Topbar: React.FC<TopbarProps> = ({ onOpenMobileMenu }) => {
               <h1 className="text-base sm:text-xl font-bold text-white tracking-tight">
                 {getGreeting()}, {displayName}
               </h1>
-              <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-medium bg-cyan-500/15 text-cyan-300 border border-cyan-400/30">
+              <button
+                type="button"
+                id="topbar-secret-trigger-btn"
+                onClick={onLogoClick}
+                className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-medium bg-cyan-500/15 text-cyan-300 border border-cyan-400/30 hover:border-cyan-400/60 cursor-pointer transition-all active:scale-95"
+                title="StudyVault OS"
+              >
                 <Sparkles className="w-3 h-3 text-cyan-400" />
                 Adaptive OS
-              </span>
+              </button>
             </div>
             <p className="text-xs sm:text-sm text-slate-400 font-normal mt-0.5">
               Ready to make some progress?

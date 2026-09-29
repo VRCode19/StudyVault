@@ -20,7 +20,11 @@ import { Badge } from '../components/common/Badge';
 import { GlassCard } from '../components/common/GlassCard';
 import { ProgressRing } from '../components/progress/ProgressRing';
 
-export const LandingPage: React.FC = () => {
+interface LandingPageProps {
+  onLogoClick?: () => void;
+}
+
+export const LandingPage: React.FC<LandingPageProps> = ({ onLogoClick }) => {
   const { setActivePage, isAuthenticated } = useStudyVault();
 
   return (
@@ -33,17 +37,22 @@ export const LandingPage: React.FC = () => {
 
       {/* Navigation bar */}
       <header className="relative z-20 max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-cyan-500 text-white shadow-blue-glow border border-white/20">
+        <button
+          type="button"
+          onClick={onLogoClick}
+          className="flex items-center gap-3 text-left cursor-pointer group"
+          title="Studyvault"
+        >
+          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-cyan-500 text-white shadow-blue-glow border border-white/20 group-hover:scale-105 transition-transform">
             <Sparkles className="w-5 h-5" />
           </div>
           <div>
-            <span className="font-extrabold text-lg tracking-tight text-white">Studyvault</span>
+            <span className="font-extrabold text-lg tracking-tight text-white group-hover:text-blue-200 transition-colors">Studyvault</span>
             <span className="ml-1.5 text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">
               OS
             </span>
           </div>
-        </div>
+        </button>
 
         <nav className="hidden md:flex items-center gap-8 text-xs font-semibold uppercase tracking-wider text-slate-400">
           <a href="#how-it-works" className="hover:text-white transition-colors">
