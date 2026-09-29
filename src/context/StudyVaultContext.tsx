@@ -16,6 +16,7 @@ import {
   VaultResource,
 } from '../types/studyvault';
 import { aiService } from '../services/aiService';
+import { getCompletedStudyForDate, addStudyRecord } from '../services/studyTrackingService';
 
 export interface ToastItem {
   id: string;
@@ -77,6 +78,7 @@ interface StudyVaultContextType {
   clearUserData: () => void;
   resetDemoData: () => void; // alias for clearUserData
   addSubject: (subject: Omit<Subject, 'id'>) => void;
+  updateSubject: (subjectId: string, updates: Partial<Subject>) => void;
   deleteSubject: (subjectId: string) => void;
   addExam: (exam: Omit<ExamDeadline, 'id'>) => void;
   deleteExam: (examId: string) => void;
@@ -822,6 +824,32 @@ export const StudyVaultProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     showToast('Subject Added', `Added ${newSubject.name} (${newSubject.code}) to your vault.`, 'success');
   };
 
+  const updateSubject = (subjectId: string, updates: Partial<Subject>) => {
+    setSubjects((prev) =>
+      prev.map((s) => {
+        if (s.id === subjectId) {
+          return { ...s, ...updates };
+        }
+        return s;
+      })
+    );
+    if (updates.name || updates.accentColor) {
+      setSessions((prev) =>
+        prev.map((sess) => {
+          if (sess.subjectId === subjectId) {
+            return {
+              ...sess,
+              subjectName: updates.name || sess.subjectName,
+              subjectColor: updates.accentColor || sess.subjectColor,
+            };
+          }
+          return sess;
+        })
+      );
+    }
+    showToast('Subject Updated', 'Subject details have been saved.', 'success');
+  };
+
   const deleteSubject = (subjectId: string) => {
     setSubjects((prev) => prev.filter((s) => s.id !== subjectId));
     setSessions((prev) => prev.filter((s) => s.subjectId !== subjectId));
@@ -898,6 +926,22 @@ export const StudyVaultProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     );
 
     if (wasCompleted) {
+      const completedSession = sessions.find((s) => s.id === sessionId);
+      if (completedSession) {
+        addStudyRecord({
+          id: `sr-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          userId: currentUser?.id,
+          subjectId: completedSession.subjectId,
+          subjectName: completedSession.subjectName,
+          date: completedSession.date || new Date().toISOString().split('T')[0],
+          startTime: new Date().toISOString(),
+          durationSeconds: (completedSession.durationMinutes || 45) * 60,
+          type: 'session_complete',
+          source: 'calendar',
+          createdAt: new Date().toISOString(),
+        }).catch((err) => console.warn('[StudyRecord] Save failed:', err));
+      }
+
       try {
         confetti({
           particleCount: 40,
@@ -1065,9 +1109,57 @@ export const StudyVaultProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setIsAiThinking(true);
 
     try {
+      // Assemble real-time StudyVault context for grounded answers & calculations
+      const today = new Date().toISOString().split('T')[0];
+      const daysOfWeekList: DayOfWeek[] = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+      const currentDayOfWeek = daysOfWeekList[new Date().getDay()];
+      const dayStudyMap = await getCompletedStudyForDate(today).catch(() => new Map<string, number>());
+
+      const contextPayload = {
+        today,
+        dayOfWeek: currentDayOfWeek,
+        subjects: subjects.map((s) => ({
+          id: s.id,
+          name: s.name,
+          code: s.code,
+          targetDailyMinutes: s.targetDailyMinutes || 60,
+        })),
+        todayScheduledSessions: sessions
+          .filter((s) => s.date === today || s.dayOfWeek === currentDayOfWeek)
+          .map((s) => ({
+            id: s.id,
+            subjectName: s.subjectName,
+            topicName: s.topicName,
+            startTime: s.startTime,
+            durationMinutes: s.durationMinutes,
+            status: s.status,
+          })),
+        subjectProgressToday: subjects.map((s) => {
+          const planned = sessions
+            .filter(
+              (sess) =>
+                (sess.date === today || sess.dayOfWeek === currentDayOfWeek) &&
+                (sess.subjectId === s.id || sess.subjectName.toLowerCase() === s.name.toLowerCase())
+            )
+            .reduce((acc, sess) => acc + sess.durationMinutes, 0);
+          const completed =
+            dayStudyMap.get(s.id) ||
+            dayStudyMap.get(s.name.toLowerCase().trim()) ||
+            0;
+          return {
+            subject: s.name,
+            plannedMinutes: planned,
+            completedMinutes: completed,
+            remainingMinutes: Math.max(0, planned - completed),
+            completedGoal: planned > 0 && completed >= planned,
+          };
+        }),
+      };
+
       const response = await aiService.askAssistant(text, [...chatMessages, userMsg], {
         files,
         conversationId,
+        context: contextPayload,
       });
 
       const aiMsg: ChatMessage = {
@@ -1082,6 +1174,91 @@ export const StudyVaultProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
       setChatMessages((prev) => [...prev, aiMsg]);
 
+      // Execute validated structured AI actions
+      if (Array.isArray(response.actions) && response.actions.length > 0) {
+        for (const action of response.actions) {
+          if (action.type === 'create_subject') {
+            const subName = action.parameters?.name;
+            if (subName && !subjects.some((s) => s.name.toLowerCase() === subName.toLowerCase())) {
+              const code =
+                action.parameters?.code ||
+                `${subName.replace(/[^A-Za-z0-9]/g, '').slice(0, 4).toUpperCase() || 'SUB'}101`;
+              const durationMins =
+                Number(action.parameters?.studyDurationMinutes) ||
+                Number(action.parameters?.studyDuration) ||
+                120;
+              addSubject({
+                name: subName,
+                code,
+                description: action.parameters?.description,
+                accentColor: action.parameters?.color || '#3b82f6',
+                glowColor: 'rgba(59, 130, 246, 0.4)',
+                totalTopics: 0,
+                completedTopics: 0,
+                totalMinutes: durationMins,
+                completedMinutes: 0,
+                progressPercentage: 0,
+                topics: [],
+                professor: action.parameters?.professor,
+                targetDailyMinutes: durationMins,
+                createdAt: new Date().toISOString(),
+              });
+              showToast('AI Action', `Created subject: ${subName}`, 'success');
+            }
+          } else if (
+            action.type === 'create_study_session' ||
+            action.type === 'schedule_study_session'
+          ) {
+            const params = action.parameters;
+            if (params?.subjectName) {
+              const matchedSub = subjects.find(
+                (s) => s.name.toLowerCase() === params.subjectName.toLowerCase()
+              );
+              const duration = Number(params.durationMinutes) || 60;
+              const sessionDate = params.date || today;
+              const dateObj = new Date(sessionDate);
+              const dayStr = daysOfWeekList[
+                isNaN(dateObj.getDay()) ? new Date().getDay() : dateObj.getDay()
+              ];
+              const startTime = params.startTime || '14:00';
+              const [h, m] = startTime.split(':').map(Number);
+              const endMinutes = (h || 14) * 60 + (m || 0) + duration;
+              const endH = Math.floor(endMinutes / 60) % 24;
+              const endM = endMinutes % 60;
+              const endTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+
+              addSession({
+                subjectId: matchedSub?.id || 'sub-ai-' + Date.now(),
+                subjectName: params.subjectName,
+                subjectColor: matchedSub?.accentColor || '#06b6d4',
+                topicId: 'top-ai-' + Date.now(),
+                topicName: params.topicName || `${params.subjectName} Focus Session`,
+                startTime,
+                endTime,
+                durationMinutes: duration,
+                date: sessionDate,
+                dayOfWeek: dayStr,
+                status: 'pending',
+                isAdaptive: true,
+                adaptiveReason: params.adaptiveReason || 'Scheduled by AI Strategist',
+              });
+              showToast('AI Action', `Scheduled ${params.subjectName} for ${sessionDate}`, 'adaptive');
+            }
+          } else if (action.type === 'create_task') {
+            if (action.parameters?.title) {
+              addTask({
+                title: action.parameters.title,
+                subject: action.parameters.subject || subjects[0]?.name || 'Academic',
+                dueDate: action.parameters.dueDate || 'Today',
+                priority: action.parameters.priority || 'medium',
+                completed: false,
+              });
+              showToast('AI Action', `Added task: ${action.parameters.title}`, 'info');
+            }
+          }
+        }
+      }
+
       if (response.actionCard) {
         showToast('Schedule Adapted', 'Proposed schedule shifts ready for review.', 'adaptive');
       } else if (response.extractionData) {
@@ -1089,14 +1266,17 @@ export const StudyVaultProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
     } catch (err: any) {
       console.warn('[AIChat] AI service call failed:', err);
+      const safeErrorMsg =
+        err?.message ||
+        'The AI service is temporarily unavailable. Please try again in a moment.';
       const aiMsg: ChatMessage = {
         id: 'msg-' + (Date.now() + 1),
         sender: 'assistant',
-        text: `I encountered an issue contacting the AI strategist service (${err?.message || 'Connection error'}). Ensure the AI server is running on port 5001 with your API key configured.`,
+        text: safeErrorMsg,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
       setChatMessages((prev) => [...prev, aiMsg]);
-      showToast('AI Service Notice', 'Could not reach server on port 5001.', 'warning');
+      showToast('AI Service Notice', safeErrorMsg, 'warning');
     } finally {
       setIsAiThinking(false);
     }
@@ -1571,6 +1751,7 @@ export const StudyVaultProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         clearUserData,
         resetDemoData: clearUserData,
         addSubject,
+        updateSubject,
         deleteSubject,
         addExam,
         deleteExam,

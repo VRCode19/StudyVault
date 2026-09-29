@@ -8,14 +8,25 @@ import {
   TimetableSlotItem,
 } from '../types/studyvault';
 
-const AI_API_BASE = import.meta.env.VITE_AI_API_URL || '/api/ai';
+// In development, Vite proxies /api/ai → localhost:5001.
+// In production, VITE_AI_SERVICE_URL points to the Render deployment.
+const AI_API_BASE = import.meta.env.VITE_AI_SERVICE_URL
+  ? `${import.meta.env.VITE_AI_SERVICE_URL}/api/ai`
+  : (import.meta.env.VITE_AI_API_URL || '/api/ai');
+
+export interface AIStructuredAction {
+  type: string;
+  status: string;
+  parameters?: Record<string, any>;
+  details?: any;
+}
 
 export interface ChatServiceResponse {
   replyText: string;
   actionCard?: ChatActionCard;
   toolsUsed?: string[];
   extractionData?: ExtractionPreview;
-  actions?: string[];
+  actions?: AIStructuredAction[];
 }
 
 export interface ExtractedTopic {
@@ -81,6 +92,7 @@ export class AIService {
       files?: File[];
       conversationId?: string;
       authHeader?: string;
+      context?: any;
     }
   ): Promise<ChatServiceResponse> {
     const headers: Record<string, string> = {};
@@ -102,6 +114,9 @@ export class AIService {
       if (options.conversationId) {
         formData.append('conversation_id', options.conversationId);
       }
+      if (options.context) {
+        formData.append('context', JSON.stringify(options.context));
+      }
       for (const file of options.files) {
         formData.append('files', file);
       }
@@ -112,6 +127,7 @@ export class AIService {
         message,
         history: historyPayload,
         conversation_id: options?.conversationId,
+        context: options?.context,
       });
     }
 
@@ -125,13 +141,16 @@ export class AIService {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(
-          errorData.message || `AI Server responded with status ${response.status}`
+          errorData.message || 'AI service is temporarily unavailable. Please try again.'
         );
       }
 
       return (await response.json()) as ChatServiceResponse;
     } catch (err: any) {
-      console.error('[AIService] Error communicating with AI service:', err);
+      console.error('[AIService] Diagnostic log:', err?.message || err);
+      if (!err.message || err.message.includes('fetch') || err.message.includes('Network') || err.message.includes('Failed to fetch')) {
+        throw new Error("I couldn't connect to the AI service right now. Please try again in a moment.");
+      }
       throw err;
     }
   }
@@ -168,7 +187,7 @@ export class AIService {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(
-          errorData.message || `Vision engine responded with status ${response.status}`
+          errorData.message || 'Image analysis service is temporarily unavailable. Please try again.'
         );
       }
 
@@ -206,7 +225,7 @@ export class AIService {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(
-          errorData.message || `Timetable analyzer responded with status ${response.status}`
+          errorData.message || 'Timetable analysis service is temporarily unavailable. Please try again.'
         );
       }
 
@@ -244,7 +263,7 @@ export class AIService {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(
-          errorData.message || `Exam timetable analyzer responded with status ${response.status}`
+          errorData.message || 'Exam timetable analysis service is temporarily unavailable. Please try again.'
         );
       }
 
@@ -292,7 +311,7 @@ export class AIService {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(
-          errorData.message || `Syllabus analyzer responded with status ${response.status}`
+          errorData.message || 'Syllabus analysis service is temporarily unavailable. Please try again.'
         );
       }
 

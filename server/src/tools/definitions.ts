@@ -146,20 +146,40 @@ export const AI_TOOLS = [
     function: {
       name: 'create_study_session',
       description:
-        'Create a new study session through the backend scheduler. Use when the AI needs to add a session to the student\'s timetable. The backend validates the session and saves it.',
+        'Create a new study session through the backend scheduler. Use when the AI needs to add a session to the student\'s timetable or calendar. The backend validates the session and saves it.',
       parameters: {
         type: 'object',
         properties: {
-          subjectId: { type: 'string', description: 'ID of the subject' },
+          subjectId: { type: 'string', description: 'ID of the subject (optional)' },
           subjectName: { type: 'string', description: 'Name of the subject' },
-          topicName: { type: 'string', description: 'Topic to study' },
-          date: { type: 'string', description: 'Session date YYYY-MM-DD' },
-          startTime: { type: 'string', description: 'Start time HH:mm' },
-          endTime: { type: 'string', description: 'End time HH:mm' },
-          durationMinutes: { type: 'number', description: 'Duration in minutes' },
+          topicName: { type: 'string', description: 'Topic to study (defaults to subject focus if omitted)' },
+          date: { type: 'string', description: 'Session date YYYY-MM-DD or "today"' },
+          startTime: { type: 'string', description: 'Start time HH:mm (e.g. 14:00)' },
+          endTime: { type: 'string', description: 'End time HH:mm (optional)' },
+          durationMinutes: { type: 'number', description: 'Duration in minutes (e.g. 60)' },
           adaptiveReason: { type: 'string', description: 'Why this session was created (optional)' },
         },
-        required: ['subjectName', 'topicName', 'date', 'startTime', 'durationMinutes'],
+        required: ['subjectName', 'durationMinutes'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'schedule_study_session',
+      description:
+        'Schedule a study session for a subject into the calendar. Use when asked to schedule study time for today or a specific date.',
+      parameters: {
+        type: 'object',
+        properties: {
+          subjectName: { type: 'string', description: 'Name of the subject' },
+          topicName: { type: 'string', description: 'Topic or module to study (optional)' },
+          date: { type: 'string', description: 'Date YYYY-MM-DD or "today"' },
+          startTime: { type: 'string', description: 'Start time HH:mm (e.g. 10:00 or 14:00)' },
+          durationMinutes: { type: 'number', description: 'Duration in minutes (e.g. 60 for 1 hour)' },
+          adaptiveReason: { type: 'string', description: 'Reason or notes for scheduling' },
+        },
+        required: ['subjectName', 'durationMinutes'],
       },
     },
   },
@@ -215,16 +235,21 @@ export const AI_TOOLS = [
     function: {
       name: 'create_subject',
       description:
-        'Register a new subject (with its modules and topics) into the backend from AI extraction results. Use after the student confirms extracted syllabus data.',
+        'Create a new academic subject in StudyVault. Use when the student asks to add or create a subject (e.g. "Create a subject called Database Management Systems").',
       parameters: {
         type: 'object',
         properties: {
           name: { type: 'string', description: 'Subject name' },
-          code: { type: 'string', description: 'Course code, e.g. CS201' },
+          code: { type: 'string', description: 'Course code, e.g. CS201 (optional)' },
           examDate: { type: 'string', description: 'Exam date YYYY-MM-DD (optional)' },
+          studyDurationMinutes: { type: 'number', description: 'Target weekly or daily study duration in minutes (e.g. 240 for 4 hours)' },
+          studyFrequency: { type: 'string', description: 'Study frequency, e.g. "daily", "weekly"' },
+          description: { type: 'string', description: 'Optional subject description or notes' },
+          professor: { type: 'string', description: 'Professor / faculty name (optional)' },
+          color: { type: 'string', description: 'Accent color hex code (optional)' },
           modules: {
             type: 'array',
-            description: 'Modules with their topics',
+            description: 'Optional modules with their topics',
             items: {
               type: 'object',
               properties: {
@@ -247,7 +272,25 @@ export const AI_TOOLS = [
             },
           },
         },
-        required: ['name', 'code', 'modules'],
+        required: ['name'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'create_task',
+      description:
+        'Create a new academic task or to-do item for a subject.',
+      parameters: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', description: 'Task title' },
+          subject: { type: 'string', description: 'Associated subject name' },
+          dueDate: { type: 'string', description: 'Due date string or YYYY-MM-DD' },
+          priority: { type: 'string', enum: ['low', 'medium', 'high'] },
+        },
+        required: ['title'],
       },
     },
   },

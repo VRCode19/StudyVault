@@ -1,3 +1,5 @@
+// Extended StudyVault types for PDF, study tracking, and profile features
+
 export type DayOfWeek = 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN';
 
 export type SessionStatus = 'pending' | 'in-progress' | 'completed' | 'rescheduled' | 'missed';
@@ -17,6 +19,7 @@ export interface Subject {
   id: string;
   name: string;
   code: string;
+  description?: string;
   accentColor: string; // Tailwind class or hex
   glowColor: string;
   totalTopics: number;
@@ -26,6 +29,9 @@ export interface Subject {
   progressPercentage: number;
   examDate?: string;
   topics: Topic[];
+  professor?: string;
+  targetDailyMinutes?: number;
+  createdAt?: string;
 }
 
 export interface StudySession {
@@ -45,6 +51,65 @@ export interface StudySession {
   adaptiveReason?: string;
   originalSlot?: string;
   notes?: string;
+}
+
+// ─── NEW: Actual study reading/tracking records ───
+
+export interface ActualStudyRecord {
+  id: string;
+  userId?: string;
+  subjectId: string;
+  subjectName: string;
+  pdfId?: string;
+  pdfName?: string;
+  date: string;        // "2026-09-29"
+  startTime: string;   // ISO timestamp
+  endTime?: string;    // ISO timestamp
+  durationSeconds: number;
+  type: 'pdf_reading' | 'manual' | 'timer' | 'session_complete';
+  source: 'vault' | 'calendar' | 'manual' | 'ai';
+  createdAt: string;
+}
+
+// ─── NEW: PDF metadata stored alongside binary in IndexedDB ───
+
+export interface PDFDocument {
+  id: string;
+  subjectId: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  createdAt: string;
+  updatedAt: string;
+  lastOpenedAt?: string;
+  currentPage: number;
+  totalPages: number;
+  readingProgress: number; // 0-100
+  totalReadingTimeSeconds: number;
+  lastReadingSession?: string;
+}
+
+// ─── NEW: Profile statistics derived from ActualStudyRecord ───
+
+export interface StudyStatistics {
+  totalStudyTimeSeconds: number;
+  todayStudyTimeSeconds: number;
+  thisWeekStudyTimeSeconds: number;
+  thisMonthStudyTimeSeconds: number;
+  averageDailyStudySeconds: number;
+  averageSessionDurationSeconds: number;
+  currentStreak: number;
+  longestStreak: number;
+  totalStudyDays: number;
+  subjectsStudied: number;
+  pdfsRead: number;
+}
+
+export interface DayStudyData {
+  date: string;
+  totalSeconds: number;
+  sessions: number;
+  subjects: string[];
 }
 
 export interface AdaptiveNotification {
@@ -248,6 +313,7 @@ export interface StudySettings {
   accentTheme: 'electric' | 'cyan' | 'slate';
   themeMode?: 'dark' | 'light';
   reducedMotion: boolean;
+  studyStreakThresholdMinutes?: number;
 }
 
 export interface TaskItem {
@@ -272,6 +338,7 @@ export interface VaultResource {
   content?: string; // Markdown or plain text content for the Note Viewer
   tags?: string[];
   bookmarked?: boolean;
+  pdfDocumentId?: string; // Link to IndexedDB PDF document
 }
 
 export interface User {
@@ -299,4 +366,5 @@ export type ActivePage =
   | 'progress'
   | 'assistant'
   | 'settings'
-  | 'syllabus';
+  | 'syllabus'
+  | 'profile';

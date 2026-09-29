@@ -18,7 +18,8 @@ export class ChatService {
     history: Array<{ sender: 'user' | 'assistant'; text: string }>,
     authHeader?: string,
     conversationId?: string,
-    imageFiles?: ProcessedFile[]
+    imageFiles?: ProcessedFile[],
+    studyvaultContext?: any
   ): Promise<ChatResponse> {
     const convId = conversationId || 'default';
     const trimmedMsg = userMessage.trim();
@@ -142,6 +143,10 @@ export class ChatService {
 
     // 3. Get conversation context summary for system prompt
     const contextSummary = conversationService.getContextSummary(convId);
+    let stateContext = '';
+    if (studyvaultContext) {
+      stateContext = `\n\n[CURRENT REAL-TIME STUDYVAULT DATA]:\n${JSON.stringify(studyvaultContext, null, 2)}\nUse this real-time data to answer questions about the student's current subjects, today's schedule, planned study time, completed study time, and remaining time. Always calculate remaining study accurately: planned - completed.`;
+    }
     const contextNote = contextSummary ? `\n[SYSTEM CONTEXT: ${contextSummary}]` : '';
 
     // 4. Build message list
@@ -150,7 +155,7 @@ export class ChatService {
     const messages: ChatCompletionMessage[] = [
       {
         role: 'system',
-        content: CHAT_SYSTEM_PROMPT + contextNote,
+        content: CHAT_SYSTEM_PROMPT + contextNote + stateContext,
       },
       ...recentHistory.map((msg) => ({
         role: (msg.sender === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
@@ -164,7 +169,7 @@ export class ChatService {
 
     const toolsUsed: string[] = [];
     let pendingProposal: ActionCardProposal | undefined = undefined;
-    let actions: Array<{ type: string; status: string; details?: any }> = [];
+    let actions: Array<{ type: string; status: string; parameters?: any; details?: any }> = [];
     const MAX_TOOL_TURNS = 3;
 
     // 5. Autonomous multi-turn tool calling loop
@@ -218,11 +223,15 @@ export class ChatService {
             pendingProposal = proposal;
           }
 
-          // Track write actions
+          // Track write actions with full validated parameters
           if (result.status && result.status !== 'proposal_created') {
             actions.push({
               type: functionName,
               status: result.status,
+              parameters: {
+                ...parsedArgs,
+                ...result,
+              },
               details: result.message,
             });
           }

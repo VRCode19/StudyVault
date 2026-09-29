@@ -11,6 +11,7 @@ export const ChatRequestSchema = z.object({
   message: z.string().min(1, 'User message cannot be empty').max(5000, 'Message exceeds length limit'),
   history: z.array(ChatMessageInputSchema).default([]),
   conversation_id: z.string().optional(),
+  context: z.any().optional(),
 });
 
 export const ActionCardShiftSchema = z.object({
@@ -68,6 +69,7 @@ export const ActionCardSchema = z.union([
 export const ActionSchema = z.object({
   type: z.string(),
   status: z.string(),
+  parameters: z.record(z.any()).optional(),
   details: z.any().optional(),
 });
 

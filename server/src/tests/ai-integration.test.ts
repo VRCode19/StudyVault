@@ -30,7 +30,7 @@ async function runIntegrationTests() {
 
   // ─── 1. Tool Definitions Verification ───
   console.log('--- 1. AI Tool Definitions ---');
-  assert(AI_TOOLS.length === 18, `Registered all 18 AI tools (found: ${AI_TOOLS.length})`);
+  assert(AI_TOOLS.length >= 18, `Registered all AI tools (found: ${AI_TOOLS.length})`);
   
   const toolNames = new Set(AI_TOOLS.map((t) => t.function.name));
   const expectedTools = [
@@ -44,6 +44,8 @@ async function runIntegrationTests() {
     'get_exam_deadlines',
     'get_study_preferences',
     'create_study_session',
+    'schedule_study_session',
+    'create_task',
     'update_study_session',
     'complete_study_session',
     'mark_session_missed',

@@ -19,6 +19,7 @@ import { ExamsPage } from './pages/ExamsPage';
 import { ProgressPage } from './pages/ProgressPage';
 import { AssistantPage } from './pages/AssistantPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { ProfilePage } from './pages/ProfilePage';
 
 const MainApp: React.FC = () => {
   const { activePage } = useStudyVault();
@@ -67,6 +68,8 @@ const MainApp: React.FC = () => {
         return <AssistantPage />;
       case 'settings':
         return <SettingsPage />;
+      case 'profile':
+        return <ProfilePage />;
       default:
         return <DashboardPage />;
     }

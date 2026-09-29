@@ -74,6 +74,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onCloseMobile })
       badge: 'Pro',
     },
     {
+      id: 'profile',
+      label: 'Profile',
+      icon: <BarChart3 className="w-4 h-4 text-amber-400" />,
+      badge: 'Stats',
+    },
+    {
       id: 'settings',
       label: 'Settings',
       icon: <Settings className="w-4 h-4 text-slate-400" />,

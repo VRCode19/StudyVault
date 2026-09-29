@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Calendar as CalendarIcon,
   Sparkles,
@@ -11,6 +11,8 @@ import {
   Tag,
   AlertCircle,
   BookOpen,
+  Target,
+  Flame,
 } from 'lucide-react';
 import { useStudyVault } from '../../context/StudyVaultContext';
 import { GlassCard } from '../common/GlassCard';
@@ -19,6 +21,7 @@ import { GlassBadge } from '../common/GlassBadge';
 import { GlassModal } from '../common/GlassModal';
 import { GlassInput } from '../common/GlassInput';
 import { DayOfWeek, StudySession } from '../../types/studyvault';
+import { getCompletedStudyForDate } from '../../services/studyTrackingService';
 
 export const StudyCalendar: React.FC = () => {
   const {
@@ -55,8 +58,9 @@ export const StudyCalendar: React.FC = () => {
   monday.setDate(now.getDate() - currentDayOfWeekIdx);
 
   const monthYearStr = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const todayDateStr = now.toISOString().split('T')[0];
 
-  const dayDates = days.reduce<Record<DayOfWeek, { dateStr: string; dayNum: number; isToday: boolean }>>(
+  const dayDates = days.reduce<Record<DayOfWeek, { dateStr: string; dayNum: number; isToday: boolean; dateKey: string }>>(
     (acc, day, idx) => {
       const d = new Date(monday);
       d.setDate(monday.getDate() + idx);
@@ -65,11 +69,74 @@ export const StudyCalendar: React.FC = () => {
         dateStr: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
         dayNum: d.getDate(),
         isToday,
+        dateKey: d.toISOString().split('T')[0],
       };
       return acc;
     },
     {} as any
   );
+
+  // Load completed study records per date from central tracking service
+  const [completedStudyMap, setCompletedStudyMap] = useState<Map<string, Map<string, number>>>(new Map());
+
+  const loadCompletedStudy = useCallback(async () => {
+    const map = new Map<string, Map<string, number>>();
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      const dateStr = d.toISOString().split('T')[0];
+      const dayMap = await getCompletedStudyForDate(dateStr).catch(() => new Map<string, number>());
+      map.set(dateStr, dayMap);
+    }
+    if (!map.has(todayDateStr)) {
+      const todayMap = await getCompletedStudyForDate(todayDateStr).catch(() => new Map<string, number>());
+      map.set(todayDateStr, todayMap);
+    }
+    setCompletedStudyMap(map);
+  }, [monday, todayDateStr]);
+
+  useEffect(() => {
+    loadCompletedStudy();
+    const interval = setInterval(loadCompletedStudy, 15000);
+    return () => clearInterval(interval);
+  }, [loadCompletedStudy]);
+
+  // Today's per-subject progress summary (planned, completed, remaining)
+  const todayCompleted = completedStudyMap.get(todayDateStr) || new Map<string, number>();
+  const todaySubjectProgress = subjects
+    .map((sub) => {
+      const planned = sessions
+        .filter(
+          (s) =>
+            (s.date === todayDateStr || s.dayOfWeek === currentDayName) &&
+            (s.subjectId === sub.id || s.subjectName.toLowerCase() === sub.name.toLowerCase())
+        )
+        .reduce((sum, s) => sum + s.durationMinutes, 0);
+
+      if (planned === 0) return null;
+
+      const completed =
+        todayCompleted.get(sub.id) ||
+        todayCompleted.get(sub.name.toLowerCase().trim()) ||
+        0;
+      const remaining = Math.max(0, planned - completed);
+      const isDone = completed >= planned;
+
+      return {
+        subject: sub,
+        planned,
+        completed,
+        remaining,
+        isDone,
+      };
+    })
+    .filter(Boolean) as Array<{
+    subject: (typeof subjects)[0];
+    planned: number;
+    completed: number;
+    remaining: number;
+    isDone: boolean;
+  }>;
 
   const handleAddSessionSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -256,6 +323,53 @@ export const StudyCalendar: React.FC = () => {
             ))}
           </div>
         </div>
+
+        {/* Today's Study Progress Tracker (Planned vs Completed vs Remaining) */}
+        {todaySubjectProgress.length > 0 && (
+          <div className="pt-3 border-t border-white/10">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                <Target className="w-3.5 h-3.5 text-cyan-400" />
+                Today's Scheduled Study Targets
+              </span>
+              <span className="text-[11px] text-slate-400 font-mono">
+                {todaySubjectProgress.filter((p) => p.isDone).length} of {todaySubjectProgress.length} goals completed
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              {todaySubjectProgress.map((item) => (
+                <div
+                  key={item.subject.id}
+                  className="p-2.5 rounded-card-sm liquid-glass-1 border border-white/10 flex items-center justify-between text-xs"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span
+                      className="w-2.5 h-2.5 rounded-full shrink-0"
+                      style={{ backgroundColor: item.subject.accentColor }}
+                    />
+                    <div className="min-w-0">
+                      <div className="font-bold text-white truncate max-w-[140px]">{item.subject.name}</div>
+                      <div className="text-[10px] text-slate-400 font-mono">
+                        Planned: {item.planned}m • Completed: {item.completed}m
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    {item.isDone ? (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-400/30 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" /> Done
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-400/30">
+                        {item.remaining}m left
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* -------------------------------------------------------------
@@ -359,10 +473,41 @@ export const StudyCalendar: React.FC = () => {
                                 {session.topicName}
                               </h5>
 
-                              <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono pt-1 border-t border-white/10">
-                                <span>{session.startTime}</span>
-                                <span>{session.durationMinutes}m</span>
-                              </div>
+                              {/* Study tracking progress (planned vs completed vs remaining) */}
+                              {(() => {
+                                const targetDate = dayInfo?.dateKey || session.date || todayDateStr;
+                                const dayRecs = completedStudyMap.get(targetDate);
+                                const completedMins = dayRecs
+                                  ? (dayRecs.get(session.subjectId) || dayRecs.get(session.subjectName.toLowerCase().trim()) || 0)
+                                  : 0;
+                                const plannedMins = session.durationMinutes || 45;
+                                const remainingMins = Math.max(0, plannedMins - completedMins);
+                                const isGoalMet = isDone || (plannedMins > 0 && completedMins >= plannedMins);
+
+                                return (
+                                  <div className="space-y-1 pt-1.5 border-t border-white/10">
+                                    <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono">
+                                      <span>{session.startTime}</span>
+                                      <span>{plannedMins}m planned</span>
+                                    </div>
+                                    {isGoalMet ? (
+                                      <div className="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
+                                        <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                                        <span>Goal completed</span>
+                                      </div>
+                                    ) : completedMins > 0 ? (
+                                      <div className="flex items-center justify-between text-[10px] font-mono">
+                                        <span className="text-cyan-300 font-semibold">{remainingMins}m left</span>
+                                        <span className="text-slate-400">{completedMins}m done</span>
+                                      </div>
+                                    ) : (
+                                      <div className="text-[10px] text-slate-400 font-mono">
+                                        {remainingMins}m remaining
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()}
                             </div>
                           </div>
                         );
@@ -448,47 +593,68 @@ export const StudyCalendar: React.FC = () => {
           </div>
 
           <div className="space-y-3">
-            {[
-              { time: '09:00 - 09:45', title: 'Data Structures & Algorithms: Red-Black Trees', subject: 'CS201', color: '#2563eb', category: 'Academic' },
-              { time: '11:00 - 11:45', title: 'Database Systems: BCNF Practice Problems', subject: 'CS304', color: '#8b5cf6', category: 'Assignment' },
-              { time: '14:00 - 15:00', title: 'Artificial Intelligence: Backprop Derivations', subject: 'CS410', color: '#06b6d4', category: 'Academic' },
-              { time: '16:30 - 17:15', title: 'Operating Systems: Mutex Lock Code Review', subject: 'CS302', color: '#14b8a6', category: 'Personal' },
-            ].map((slot, idx) => (
-              <div
-                key={idx}
-                className="p-4 rounded-btn liquid-glass-2 border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-white/20 transition-all shadow-liquid-sm"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="font-mono text-xs text-slate-300 min-w-[100px] flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-cyan-400" />
-                    {slot.time}
-                  </span>
-                  <span
-                    className="w-2.5 h-2.5 rounded-full shrink-0"
-                    style={{ backgroundColor: slot.color, boxShadow: `0 0 10px ${slot.color}` }}
-                  />
-                  <div>
-                    <h4 className="text-sm font-bold text-white">{slot.title}</h4>
-                    <p className="text-xs text-slate-400 font-mono">{slot.subject}</p>
-                  </div>
-                </div>
+            {(() => {
+              const todaySessions = filteredSessions.filter(
+                (s) => s.date === todayDateStr || s.dayOfWeek === currentDayName
+              );
 
-                <GlassBadge
-                  variant={
-                    slot.category === 'Academic'
-                      ? 'blue'
-                      : slot.category === 'Assignment'
-                      ? 'violet'
-                      : slot.category === 'Personal'
-                      ? 'teal'
-                      : 'orange'
-                  }
-                  size="sm"
-                >
-                  {slot.category}
-                </GlassBadge>
-              </div>
-            ))}
+              if (todaySessions.length === 0) {
+                return (
+                  <div className="p-8 text-center text-slate-400 liquid-glass-1 rounded-panel border border-white/10">
+                    <CalendarCheck className="w-8 h-8 text-cyan-400 mx-auto mb-2 opacity-60" />
+                    <p className="text-sm font-semibold text-white">No Study Sessions Scheduled for Today</p>
+                    <p className="text-xs text-slate-400 mt-1">Click "Add Session" above or ask the AI Strategist to plan your focus blocks.</p>
+                  </div>
+                );
+              }
+
+              return todaySessions.map((s) => {
+                const dayRecs = completedStudyMap.get(todayDateStr);
+                const completedMins = dayRecs
+                  ? (dayRecs.get(s.subjectId) || dayRecs.get(s.subjectName.toLowerCase().trim()) || 0)
+                  : 0;
+                const plannedMins = s.durationMinutes || 45;
+                const remainingMins = Math.max(0, plannedMins - completedMins);
+                const isGoalMet = s.status === 'completed' || (plannedMins > 0 && completedMins >= plannedMins);
+
+                return (
+                  <div
+                    key={s.id}
+                    onClick={() => setSelectedSession(s)}
+                    className="p-4 rounded-btn liquid-glass-2 border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-white/20 transition-all shadow-liquid-sm cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono text-xs text-slate-300 min-w-[100px] flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-cyan-400" />
+                        {s.startTime} - {s.endTime}
+                      </span>
+                      <span
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: s.subjectColor, boxShadow: `0 0 10px ${s.subjectColor}` }}
+                      />
+                      <div>
+                        <h4 className="text-sm font-bold text-white">{s.topicName}</h4>
+                        <p className="text-xs text-slate-400 font-mono">
+                          {s.subjectName} • Planned: {plannedMins}m • Completed: {completedMins}m • Remaining: {remainingMins}m
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {isGoalMet ? (
+                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-400/30 flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Study goal completed
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-400/30">
+                          {remainingMins}m remaining
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              });
+            })()}
           </div>
         </div>
       )}

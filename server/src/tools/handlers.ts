@@ -105,18 +105,25 @@ export async function executeToolCall(
 
     // ─── Write/Action Tools ───
 
+    case 'schedule_study_session':
     case 'create_study_session': {
+      const today = new Date().toISOString().split('T')[0];
+      const targetDate = !args.date || args.date === 'today' ? today : args.date;
+      const targetStart = args.startTime || '14:00';
+      const duration = Number(args.durationMinutes) || 60;
+      const topic = args.topicName || `${args.subjectName} Focus Session`;
+
       const session = await adapter.createStudySession(
         {
           subjectId: args.subjectId || '',
           subjectName: args.subjectName,
-          topicName: args.topicName,
-          date: args.date,
-          startTime: args.startTime,
+          topicName: topic,
+          date: targetDate,
+          startTime: targetStart,
           endTime: args.endTime || '',
-          durationMinutes: args.durationMinutes,
+          durationMinutes: duration,
           isAdaptive: true,
-          adaptiveReason: args.adaptiveReason || 'Created by AI assistant',
+          adaptiveReason: args.adaptiveReason || 'Scheduled by AI assistant',
         },
         authHeader
       );
@@ -124,7 +131,13 @@ export async function executeToolCall(
         result: {
           status: 'session_created',
           session,
-          message: `Study session for "${args.topicName}" on ${args.date} at ${args.startTime} has been created.`,
+          subjectName: args.subjectName,
+          topicName: topic,
+          date: targetDate,
+          startTime: targetStart,
+          durationMinutes: duration,
+          adaptiveReason: args.adaptiveReason || 'Scheduled by AI assistant',
+          message: `Study session for "${topic}" on ${targetDate} at ${targetStart} (${duration}m) has been created.`,
         },
       };
     }
@@ -189,10 +202,13 @@ export async function executeToolCall(
     }
 
     case 'create_subject': {
+      const fallbackCode = args.code || `${(args.name || 'SUB').replace(/[^A-Za-z0-9]/g, '').slice(0, 4).toUpperCase() || 'SUB'}101`;
+      const studyDuration = args.studyDurationMinutes || args.studyDuration || 120;
+
       const created = await adapter.createSubject(
         {
           name: args.name,
-          code: args.code,
+          code: fallbackCode,
           examDate: args.examDate,
           modules: args.modules || [],
         },
@@ -203,7 +219,27 @@ export async function executeToolCall(
           status: 'subject_created',
           subjectId: created.subjectId,
           topicCount: created.topicCount,
-          message: `Subject "${args.name}" (${args.code}) has been registered with ${created.topicCount} topics.`,
+          name: args.name,
+          code: fallbackCode,
+          examDate: args.examDate,
+          studyDurationMinutes: studyDuration,
+          description: args.description,
+          professor: args.professor,
+          color: args.color,
+          message: `Subject "${args.name}" (${fallbackCode}) has been created with target study duration of ${studyDuration}m.`,
+        },
+      };
+    }
+
+    case 'create_task': {
+      return {
+        result: {
+          status: 'task_created',
+          title: args.title,
+          subject: args.subject,
+          dueDate: args.dueDate || 'Today',
+          priority: args.priority || 'medium',
+          message: `Task "${args.title}" has been created.`,
         },
       };
     }

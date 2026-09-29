@@ -19,10 +19,17 @@ export async function handleChat(req: Request, res: Response) {
       history = historyRaw;
     }
 
+    // Parse context (it might be a string if sent via FormData)
+    let contextData = req.body?.context;
+    if (typeof contextData === 'string') {
+      try { contextData = JSON.parse(contextData); } catch { /* keep as is */ }
+    }
+
     const validatedData = ChatRequestSchema.parse({
       message: messageText,
       history,
       conversation_id: conversationId,
+      context: contextData,
     });
 
     const authHeader = req.headers.authorization;
@@ -36,7 +43,8 @@ export async function handleChat(req: Request, res: Response) {
       validatedData.history,
       authHeader,
       validatedData.conversation_id,
-      processedFiles
+      processedFiles,
+      validatedData.context
     );
 
     return res.status(200).json(result);
