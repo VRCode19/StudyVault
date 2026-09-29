@@ -34,6 +34,7 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
   const [lastWinAmount, setLastWinAmount] = useState<number>(0);
   const [statusMessage, setStatusMessage] = useState<string>('PLACE YOUR BETS ON THE FELT');
   const [isSingleNumberJackpot, setIsSingleNumberJackpot] = useState(false);
+  const [ballRadius, setBallRadius] = useState<number>(148);
 
   // Sound click interval for marble
   const ballSoundIntervalRef = useRef<number | null>(null);
@@ -104,18 +105,25 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
 
     // Pocket angle (each pocket is 360 / 37 ≈ 9.7297 degrees)
     const pocketDegrees = 360 / ROULETTE_NUMBERS.length;
-    const targetWheelOffset = randomIndex * pocketDegrees;
+    
+    // To align pocket randomIndex with the ball at top (0 deg):
+    // Final wheel angle mod 360 must equal (360 - (randomIndex * pocketDegrees) % 360) % 360
+    const targetWheelMod = (360 - ((randomIndex * pocketDegrees) % 360)) % 360;
+    const currentWheelMod = ((wheelAngle % 360) + 360) % 360;
+    const forwardWheelDelta = (targetWheelMod - currentWheelMod + 360) % 360;
+    const wheelSpins = 360 * 6 + forwardWheelDelta;
 
-    // Wheel spins clockwise 5-7 full turns
-    const wheelSpins = 360 * 6 + targetWheelOffset;
-    // Ball spins counter-clockwise (reverse) 8-10 full turns
-    const ballSpins = -360 * 9;
+    // Ball spins counter-clockwise and ends at top (0 deg):
+    const currentBallMod = ((ballAngle % 360) + 360) % 360;
+    const backwardBallDelta = (currentBallMod + 360) % 360;
+    const ballSpins = 360 * 8 + backwardBallDelta;
 
     setWheelAngle((prev) => prev + wheelSpins);
-    setBallAngle((prev) => prev + ballSpins);
+    setBallAngle((prev) => prev - ballSpins);
+    setBallRadius(148);
 
     // Marble click track sound simulation
-    let clickDelay = 60;
+    let clickDelay = 55;
     let clickCount = 0;
     const playNextBallClick = () => {
       if (clickCount > 28) return;
@@ -126,10 +134,15 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
     };
     playNextBallClick();
 
+    // After 3.1s, the ball decays inward from the outer wall into the numbered pocket track
+    setTimeout(() => {
+      setBallRadius(123);
+      casinoAudio.playBallPocketDrop();
+    }, 3100);
+
     // Wheel stops after 4.2 seconds
     setTimeout(() => {
       if (ballSoundIntervalRef.current) clearTimeout(ballSoundIntervalRef.current);
-      casinoAudio.playBallPocketDrop();
 
       setWinningPocket(targetPocket);
       setIsSpinning(false);
@@ -137,7 +150,7 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
       // Evaluate bets against targetPocket
       evaluateRouletteResult(targetPocket, bets, remainingBalance);
     }, 4200);
-  }, [isSpinning, bets, chips, totalBetAmount, onUpdateChips]);
+  }, [isSpinning, bets, chips, totalBetAmount, onUpdateChips, wheelAngle, ballAngle]);
 
   const evaluateRouletteResult = (
     winPocket: RoulettePocket,
@@ -216,36 +229,138 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
     };
   }, []);
 
+  // Geometry calculations for all 37 pockets on the SVG wheel
+  const POCKET_DEGREES = 360 / ROULETTE_NUMBERS.length;
+  const HALF_STEP_RAD = (POCKET_DEGREES / 2) * (Math.PI / 180);
+  const R_OUTER = 145;
+  const R_INNER = 101;
+  const R_TEXT = 123;
+
+  const x2a = (-R_OUTER * Math.sin(HALF_STEP_RAD)).toFixed(2);
+  const y2a = (-R_OUTER * Math.cos(HALF_STEP_RAD)).toFixed(2);
+  const x2b = (R_OUTER * Math.sin(HALF_STEP_RAD)).toFixed(2);
+  const y2b = (-R_OUTER * Math.cos(HALF_STEP_RAD)).toFixed(2);
+
+  const x1b = (R_INNER * Math.sin(HALF_STEP_RAD)).toFixed(2);
+  const y1b = (-R_INNER * Math.cos(HALF_STEP_RAD)).toFixed(2);
+  const x1a = (-R_INNER * Math.sin(HALF_STEP_RAD)).toFixed(2);
+  const y1a = (-R_INNER * Math.cos(HALF_STEP_RAD)).toFixed(2);
+
+  const POCKET_PATH = `M ${x1a} ${y1a} L ${x2a} ${y2a} A ${R_OUTER} ${R_OUTER} 0 0 1 ${x2b} ${y2b} L ${x1b} ${y1b} A ${R_INNER} ${R_INNER} 0 0 0 ${x1a} ${y1a} Z`;
+
   return (
     <div className="flex flex-col items-center justify-center w-full max-w-4xl mx-auto select-none py-2 px-2">
       {/* 3D Perspective Roulette Wheel Container */}
       <div className="relative flex flex-col items-center justify-center mb-6">
-        {/* Outer Neon Glow Ring */}
-        <div className="relative w-64 h-64 sm:w-80 sm:h-80 flex items-center justify-center rounded-full p-2.5 bg-gradient-to-b from-zinc-700 via-zinc-900 to-black border-4 border-amber-600/70 shadow-[0_15px_45px_rgba(0,0,0,0.9),0_0_30px_rgba(220,38,38,0.4)]">
-          {/* Outer Chrome Ball Track */}
-          <div className="relative w-full h-full rounded-full border-4 border-zinc-800 bg-[#070709] shadow-inner flex items-center justify-center overflow-hidden">
-            {/* Spinning Wheel */}
+        {/* Outer Heavy Brass/Wood Casino Bezel */}
+        <div className="relative w-72 h-72 sm:w-96 sm:h-96 flex items-center justify-center rounded-full p-2 bg-gradient-to-b from-amber-700 via-amber-950 to-zinc-950 border-4 border-amber-600/80 shadow-[0_15px_45px_rgba(0,0,0,0.95),0_0_35px_rgba(220,38,38,0.4)]">
+          {/* Outer Dark Chrome Ball Track Basin */}
+          <div className="relative w-full h-full rounded-full border-4 border-zinc-900 bg-[#060608] shadow-inner flex items-center justify-center overflow-hidden">
+            {/* Rotating SVG European Wheel */}
             <div
-              className="relative w-[90%] h-[90%] rounded-full shadow-2xl flex items-center justify-center transition-transform duration-[4200ms] ease-out"
+              className="relative w-[92%] h-[92%] rounded-full shadow-2xl flex items-center justify-center transition-transform duration-[4200ms] ease-out"
               style={{
                 transform: `rotate(${wheelAngle}deg)`,
-                background: 'conic-gradient(#18181b 0deg 9.7deg, #991b1b 9.7deg 19.4deg, #18181b 19.4deg 29.1deg, #991b1b 29.1deg 38.8deg, #18181b 38.8deg 48.5deg, #991b1b 48.5deg 58.2deg, #18181b 58.2deg 67.9deg, #991b1b 67.9deg 77.6deg, #18181b 77.6deg 87.3deg, #991b1b 87.3deg 97deg, #18181b 97deg 106.7deg, #991b1b 106.7deg 116.4deg, #18181b 116.4deg 126.1deg, #991b1b 126.1deg 135.8deg, #18181b 135.8deg 145.5deg, #991b1b 145.5deg 155.2deg, #18181b 155.2deg 164.9deg, #991b1b 164.9deg 174.6deg, #18181b 174.6deg 184.3deg, #991b1b 184.3deg 194deg, #18181b 194deg 203.7deg, #991b1b 203.7deg 213.4deg, #18181b 213.4deg 223.1deg, #991b1b 223.1deg 232.8deg, #18181b 232.8deg 242.5deg, #991b1b 242.5deg 252.2deg, #18181b 252.2deg 261.9deg, #991b1b 261.9deg 271.6deg, #18181b 271.6deg 281.3deg, #991b1b 281.3deg 291deg, #18181b 291deg 300.7deg, #991b1b 300.7deg 310.4deg, #18181b 310.4deg 320.1deg, #991b1b 320.1deg 329.8deg, #18181b 329.8deg 339.5deg, #991b1b 339.5deg 349.2deg, #15803d 349.2deg 360deg)',
               }}
             >
-              {/* Pocket dividers & subtle radial gradient overlay */}
-              <div className="absolute inset-0 rounded-full border-2 border-amber-500/40 opacity-70" />
+              <svg viewBox="-165 -165 330 330" className="w-full h-full drop-shadow-2xl">
+                <defs>
+                  {/* Brass Turret Gradient */}
+                  <radialGradient id="brassTurret" cx="35%" cy="30%" r="70%">
+                    <stop offset="0%" stopColor="#fef08a" />
+                    <stop offset="45%" stopColor="#f59e0b" />
+                    <stop offset="85%" stopColor="#b45309" />
+                    <stop offset="100%" stopColor="#78350f" />
+                  </radialGradient>
 
-              {/* Center Turret (Brass & Chrome Conical Cone) */}
-              <div 
-                className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-amber-400 shadow-[0_0_20px_rgba(0,0,0,0.9),inset_0_2px_4px_rgba(255,255,255,0.7)] flex items-center justify-center z-10"
-                style={{
-                  background: 'radial-gradient(circle at 35% 35%, #fef08a 0%, #d97706 60%, #78350f 100%)',
-                }}
-              >
-                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-zinc-300 via-white to-zinc-400 border border-zinc-500 shadow-md flex items-center justify-center">
-                  <div className="w-2 h-2 rounded-full bg-red-600 shadow-[0_0_6px_#ef4444]" />
-                </div>
-              </div>
+                  {/* Inner Dish Bowl Gradient */}
+                  <radialGradient id="dishBowl" cx="40%" cy="40%" r="60%">
+                    <stop offset="0%" stopColor="#27272a" />
+                    <stop offset="50%" stopColor="#18181b" />
+                    <stop offset="100%" stopColor="#09090b" />
+                  </radialGradient>
+
+                  {/* Chrome Handle Gradient */}
+                  <linearGradient id="chromeHandle" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#ffffff" />
+                    <stop offset="50%" stopColor="#cbd5e1" />
+                    <stop offset="100%" stopColor="#475569" />
+                  </linearGradient>
+                </defs>
+
+                {/* Outer Wheel Track Ring */}
+                <circle r="158" fill="#121216" stroke="#27272a" strokeWidth="2" />
+                <circle r="146" fill="#09090b" stroke="#d97706" strokeWidth="1.5" />
+
+                {/* All 37 European Roulette Number Pockets */}
+                {ROULETTE_NUMBERS.map((pocket, idx) => {
+                  const angle = idx * POCKET_DEGREES;
+                  const isWinner = winningPocket?.number === pocket.number;
+
+                  return (
+                    <g key={pocket.number} transform={`rotate(${angle})`}>
+                      {/* Pocket Background Wedge */}
+                      <path
+                        d={POCKET_PATH}
+                        fill={
+                          isWinner
+                            ? '#fbbf24'
+                            : pocket.color === 'green'
+                            ? '#15803d'
+                            : pocket.color === 'red'
+                            ? '#991b1b'
+                            : '#18181b'
+                        }
+                        stroke={isWinner ? '#f59e0b' : '#cbd5e1'}
+                        strokeWidth={isWinner ? 2.5 : 0.75}
+                      />
+
+                      {/* Pocket Number Label */}
+                      <text
+                        x="0"
+                        y={-R_TEXT}
+                        fill={isWinner ? '#000000' : '#ffffff'}
+                        fontSize="11"
+                        fontWeight="900"
+                        fontFamily="monospace, sans-serif"
+                        textAnchor="middle"
+                        dominantBaseline="central"
+                      >
+                        {pocket.number}
+                      </text>
+                    </g>
+                  );
+                })}
+
+                {/* Inner Separator Ring */}
+                <circle r="101" fill="none" stroke="#d97706" strokeWidth="1.5" />
+
+                {/* Center Recessed Dish Bowl */}
+                <circle r="100" fill="url(#dishBowl)" />
+
+                {/* 8 Metallic Deflector Frets */}
+                {[0, 45, 90, 135, 180, 225, 270, 315].map((ang) => (
+                  <g key={ang} transform={`rotate(${ang})`}>
+                    <polygon
+                      points="0,-76 3,-70 0,-64 -3,-70"
+                      fill="#e2e8f0"
+                      stroke="#94a3b8"
+                      strokeWidth="0.5"
+                    />
+                  </g>
+                ))}
+
+                {/* Center Brass Turret Spindle */}
+                <circle r="44" fill="url(#brassTurret)" stroke="#fbbf24" strokeWidth="1.5" />
+
+                {/* 4-Spoke Chrome Cross Handle */}
+                <rect x="-35" y="-3.5" width="70" height="7" rx="3.5" fill="url(#chromeHandle)" stroke="#475569" strokeWidth="0.5" />
+                <rect x="-3.5" y="-35" width="7" height="70" rx="3.5" fill="url(#chromeHandle)" stroke="#475569" strokeWidth="0.5" />
+
+                {/* Center Ruby Jewel Cap */}
+                <circle r="10" fill="#dc2626" stroke="#fbbf24" strokeWidth="1.5" />
+                <circle r="4" fill="#f87171" />
+              </svg>
             </div>
 
             {/* Reverse-Spinning Polished Chrome Roulette Ball */}
@@ -256,10 +371,10 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
               }}
             >
               <div
-                className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full border border-white/80 shadow-[0_0_8px_#ffffff,0_2px_4px_rgba(0,0,0,0.9)]"
+                className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full border border-white/95 shadow-[0_0_10px_#ffffff,0_2px_4px_rgba(0,0,0,0.9)] transition-all duration-700 ease-out"
                 style={{
-                  transform: 'translateY(-110px) sm:translateY(-135px)',
-                  background: 'radial-gradient(circle at 30% 30%, #ffffff 0%, #e2e8f0 50%, #94a3b8 100%)',
+                  transform: `translateY(-${ballRadius}px)`,
+                  background: 'radial-gradient(circle at 30% 30%, #ffffff 0%, #e2e8f0 50%, #64748b 100%)',
                 }}
               />
             </div>
@@ -268,7 +383,7 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
 
         {/* Winning Number Announcement Banner */}
         {winningPocket && (
-          <div className="mt-3 flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-black/90 border-2 border-amber-400 shadow-[0_0_20px_rgba(251,191,36,0.5)] animate-bounce">
+          <div className="mt-3 flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-black/90 border-2 border-amber-400 shadow-[0_0_20px_rgba(251,191,36,0.6)] animate-bounce">
             <span
               className={`w-4 h-4 rounded-full ${
                 winningPocket.color === 'green'

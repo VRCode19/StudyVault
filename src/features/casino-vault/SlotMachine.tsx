@@ -437,31 +437,39 @@ export const SlotMachine: React.FC<SlotMachineProps> = ({
         {/* 3D Mechanical Pull Lever (Desktop / Tablet on Right Edge) */}
         <div 
           onClick={handlePullLever}
-          className="hidden md:flex flex-col items-center -ml-1 cursor-pointer group select-none relative z-30"
-          title="Pull Lever to Spin!"
+          className="hidden md:flex flex-col items-center justify-end -ml-1 cursor-pointer group select-none relative z-30"
+          style={{ height: '230px' }}
+          title="Pull Lever Down to Spin!"
         >
-          {/* Brass Mount Flange */}
-          <div className="w-6 h-12 bg-gradient-to-r from-amber-600 via-yellow-500 to-amber-700 rounded-r-lg border border-amber-400 shadow-[0_4px_8px_rgba(0,0,0,0.8)]" />
-
-          {/* Lever Arm & Ball Knob with 3D spring transform */}
+          {/* Lever Arm & Ball Knob with straight downward pull physics */}
           <div 
-            className="flex flex-col items-center transition-all ease-out"
+            className="flex flex-col items-center transition-all"
             style={{
-              transformOrigin: 'top center',
-              transform: leverPulled ? 'rotate(45deg) translateY(45px) scaleY(0.7)' : 'rotate(0deg)',
-              transitionDuration: leverPulled ? '150ms' : '450ms',
+              transformOrigin: 'bottom center',
+              transform: leverPulled 
+                ? 'translateY(95px) scaleY(0.4) rotateX(65deg)' 
+                : 'translateY(0px) scaleY(1) rotateX(0deg)',
+              transitionTimingFunction: leverPulled 
+                ? 'cubic-bezier(0.4, 0, 0.2, 1)' 
+                : 'cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+              transitionDuration: leverPulled ? '180ms' : '450ms',
             }}
           >
-            {/* Polished Chrome Rod */}
-            <div className="w-3 h-28 bg-gradient-to-r from-zinc-300 via-white to-zinc-400 shadow-[2px_0_6px_rgba(0,0,0,0.6)]" />
-
-            {/* Glossy Ruby Sphere Knob */}
+            {/* Glossy Ruby Sphere Knob at the TOP */}
             <div 
-              className="w-12 h-12 rounded-full -mt-2 border-2 border-red-400 shadow-[0_8px_20px_rgba(220,38,38,0.8),inset_0_4px_8px_rgba(255,255,255,0.7)] group-hover:scale-110 transition-transform"
+              className="w-12 h-12 rounded-full border-2 border-red-400 shadow-[0_8px_20px_rgba(220,38,38,0.85),inset_0_4px_8px_rgba(255,255,255,0.7)] group-hover:scale-105 transition-transform"
               style={{
                 background: 'radial-gradient(circle at 35% 35%, #f87171 0%, #dc2626 50%, #7f1d1d 100%)',
               }}
             />
+
+            {/* Polished Chrome Rod extending downward */}
+            <div className="w-3.5 h-28 -mt-1 bg-gradient-to-r from-zinc-300 via-white to-zinc-400 shadow-[2px_0_6px_rgba(0,0,0,0.6)] rounded-b-sm" />
+          </div>
+
+          {/* Mechanical Brass & Chrome Axle Pivot Socket at the BOTTOM */}
+          <div className="w-8 h-12 -mt-2 bg-gradient-to-b from-amber-500 via-amber-600 to-amber-800 rounded-r-xl border-2 border-amber-400 shadow-[0_6px_12px_rgba(0,0,0,0.9)] flex items-center justify-center">
+            <div className="w-4 h-4 rounded-full bg-gradient-to-tr from-zinc-400 via-white to-zinc-500 border border-zinc-600 shadow-inner" />
           </div>
         </div>
       </div>
