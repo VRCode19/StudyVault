@@ -10,10 +10,13 @@ import {
 
 // In development, Vite proxies /api/ai → localhost:5001.
 // In production, VITE_AI_SERVICE_URL points to the Render deployment.
+// If .env is not present in Vercel/host, fallback directly to the production Render URL.
+const DEFAULT_PRODUCTION_AI_URL = 'https://studyvault-0zup.onrender.com';
+
 const rawServiceUrl = (
   import.meta.env.VITE_AI_SERVICE_URL ||
   import.meta.env.VITE_AI_API_URL ||
-  ''
+  (import.meta.env.PROD ? DEFAULT_PRODUCTION_AI_URL : '')
 ).trim().replace(/\/+$/, '');
 
 export const AI_API_BASE = rawServiceUrl
