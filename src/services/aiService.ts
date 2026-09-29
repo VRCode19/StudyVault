@@ -10,9 +10,15 @@ import {
 
 // In development, Vite proxies /api/ai → localhost:5001.
 // In production, VITE_AI_SERVICE_URL points to the Render deployment.
-const AI_API_BASE = import.meta.env.VITE_AI_SERVICE_URL
-  ? `${import.meta.env.VITE_AI_SERVICE_URL}/api/ai`
-  : (import.meta.env.VITE_AI_API_URL || '/api/ai');
+const rawServiceUrl = (
+  import.meta.env.VITE_AI_SERVICE_URL ||
+  import.meta.env.VITE_AI_API_URL ||
+  ''
+).trim().replace(/\/+$/, '');
+
+export const AI_API_BASE = rawServiceUrl
+  ? (rawServiceUrl.endsWith('/api/ai') ? rawServiceUrl : `${rawServiceUrl}/api/ai`)
+  : '/api/ai';
 
 export interface AIStructuredAction {
   type: string;

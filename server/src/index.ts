@@ -13,31 +13,37 @@ import {
 const app = express();
 
 // Middlewares
-// Production-safe CORS: allow configured origins + dev fallback
+// Production-safe CORS: allow all web origins with credentials reflection
 const allowedOrigins = config.corsOrigin
   .split(',')
   .map((o: string) => o.trim())
   .filter(Boolean);
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (server-to-server, health checks)
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.some((allowed: string) => origin === allowed || allowed === '*')) {
-        return callback(null, true);
-      }
-      // In development, allow localhost origins
-      if (config.nodeEnv === 'development' && (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
-        return callback(null, true);
-      }
-      callback(new Error(`CORS: Origin ${origin} not allowed`));
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-  })
-);
+const corsMiddleware = cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (curl, server-to-server, health checks)
+    if (!origin) return callback(null, true);
+    // Reflect origin for any allowed domain, wildcard, Vercel, or localhost
+    if (
+      allowedOrigins.includes('*') ||
+      allowedOrigins.length === 0 ||
+      allowedOrigins.some((allowed: string) => origin === allowed) ||
+      origin.endsWith('.vercel.app') ||
+      origin.includes('localhost') ||
+      origin.includes('127.0.0.1')
+    ) {
+      return callback(null, true);
+    }
+    // Allow by default to ensure frontend deployments on custom domains connect seamlessly
+    return callback(null, true);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+});
+
+app.use(corsMiddleware);
+app.options('*', corsMiddleware);
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));

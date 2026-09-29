@@ -4,12 +4,7 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" }
-  ],
-  "functions": {
-    "api/**/*.ts": {
-      "maxDuration": 60,
-      "memory": 1024
-    }
-  }
+    { "source": "/api/ai/(.*)", "destination": "https://studyvault-0zup.onrender.com/api/ai/$1" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ]
 }

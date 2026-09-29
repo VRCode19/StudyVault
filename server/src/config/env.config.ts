@@ -19,7 +19,7 @@ dotenv.config(); // Fallback to standard resolution
 export const config = {
   port: parseInt(process.env.PORT || '5001', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
-  corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173,http://localhost:5174',
+  corsOrigin: process.env.CORS_ORIGIN || '*',
 
   openrouter: {
     apiKey: process.env.OPENROUTER_API_KEY || '',
