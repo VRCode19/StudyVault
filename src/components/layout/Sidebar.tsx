@@ -13,6 +13,8 @@ import {
   Bell,
   LogOut,
   ChevronRight,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { useStudyVault } from '../../context/StudyVaultContext';
 import { ActivePage } from '../../types/studyvault';
@@ -23,7 +25,7 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onCloseMobile }) => {
-  const { activePage, setActivePage, stats, notifications, currentUser, logout } = useStudyVault();
+  const { activePage, setActivePage, stats, notifications, currentUser, logout, themeMode, setThemeMode } = useStudyVault();
 
   const unreadNotifs = notifications.filter((n) => !n.read).length;
   const displayName = currentUser?.name || stats.studentName || 'Student';
@@ -214,6 +216,38 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onCloseMobile })
                 <span className="text-[10px] text-slate-500">All caught up</span>
               )}
             </button>
+
+            {/* Dark Mode & White Mode Segmented Switch */}
+            <div className="flex items-center p-1 rounded-xl bg-white/[0.04] border border-white/10 text-xs">
+              <button
+                type="button"
+                id="sidebar-dark-mode-btn"
+                onClick={() => setThemeMode('dark')}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg transition-all font-semibold cursor-pointer ${
+                  themeMode === 'dark'
+                    ? 'bg-blue-600 text-white shadow-sm font-bold border border-blue-400/30'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Switch to Dark Mode"
+              >
+                <Moon className="w-3.5 h-3.5 text-cyan-300" />
+                <span>Dark</span>
+              </button>
+              <button
+                type="button"
+                id="sidebar-white-mode-btn"
+                onClick={() => setThemeMode('light')}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg transition-all font-semibold cursor-pointer ${
+                  themeMode === 'light'
+                    ? 'bg-white text-slate-900 shadow-sm font-bold border border-slate-300'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Switch to White Mode"
+              >
+                <Sun className="w-3.5 h-3.5 text-amber-500" />
+                <span>White</span>
+              </button>
+            </div>
 
             {/* Profile Card */}
             <div className="flex items-center justify-between p-2 rounded-btn bg-white/[0.04] border border-white/10 hover:border-white/20 transition-all group">

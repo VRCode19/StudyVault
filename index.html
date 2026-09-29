@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -7,12 +7,28 @@
     <title>Studyvault — AI-Powered Adaptive Study Scheduling</title>
     <meta name="description" content="Studyvault transforms your static syllabus into an intelligent, adaptive study timetable that automatically recalculates around your life, missed sessions, and exam deadlines." />
     
+    <!-- Instant Theme Initializer (Prevents Theme Flash) -->
+    <script>
+      (function() {
+        try {
+          var mode = localStorage.getItem('studyvault_theme_mode');
+          if (mode === 'light') {
+            document.documentElement.classList.add('light');
+            document.documentElement.classList.remove('dark');
+          } else {
+            document.documentElement.classList.add('dark');
+            document.documentElement.classList.remove('light');
+          }
+        } catch(e) {}
+      })();
+    </script>
+
     <!-- Google Fonts: Plus Jakarta Sans & Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   </head>
-  <body class="bg-[#07080b] text-slate-100 selection:bg-blue-600/30 selection:text-blue-200 antialiased overflow-x-hidden min-h-screen">
+  <body class="selection:bg-blue-600/30 selection:text-blue-200 antialiased overflow-x-hidden min-h-screen">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

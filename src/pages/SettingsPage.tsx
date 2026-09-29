@@ -30,6 +30,7 @@ export const SettingsPage: React.FC = () => {
     logout,
     stats,
     themeMode,
+    setThemeMode,
     toggleTheme,
     showToast,
   } = useStudyVault();
@@ -115,50 +116,76 @@ export const SettingsPage: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {/* Dark Mode Card */}
           <div
-            onClick={() => {
-              if (themeMode !== 'dark') toggleTheme();
-            }}
-            className={`p-5 rounded-card border transition-all cursor-pointer space-y-3 ${
+            onClick={() => setThemeMode('dark')}
+            className={`p-5 rounded-card border transition-all cursor-pointer space-y-3.5 ${
               themeMode === 'dark'
-                ? 'bg-navy-950/80 border-cyan-400/50 shadow-cyan-glow/20 ring-1 ring-cyan-400/40'
+                ? 'bg-navy-950/80 border-cyan-400/50 shadow-cyan-glow/20 ring-2 ring-cyan-400/40'
                 : 'bg-white/[0.03] border-white/10 hover:border-white/20'
             }`}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Moon className="w-4 h-4 text-cyan-400" />
-                <span className="text-sm font-bold text-white">Deep Navy Atmosphere (Dark)</span>
+                <span className="text-sm font-bold text-white">Dark Mode (Deep Navy)</span>
               </div>
               {themeMode === 'dark' && <Check className="w-4 h-4 text-cyan-400" />}
             </div>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Deep blue-black base (#07111F) with translucent floating glass, subtle radial blooms, and specular rims.
+              Deep blue-black canvas with luminous translucent floating glass, specular rims, and subtle cyber glow.
             </p>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setThemeMode('dark');
+              }}
+              className={`w-full py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                themeMode === 'dark'
+                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/40'
+                  : 'bg-white/5 text-slate-300 hover:bg-white/10 border border-white/10'
+              }`}
+            >
+              <Moon className="w-3.5 h-3.5" />
+              <span>{themeMode === 'dark' ? 'Active Theme' : 'Enable Dark Mode'}</span>
+            </button>
           </div>
 
-          {/* Light Mode Card */}
+          {/* White Mode Card */}
           <div
-            onClick={() => {
-              if (themeMode !== 'light') toggleTheme();
-            }}
-            className={`p-5 rounded-card border transition-all cursor-pointer space-y-3 ${
+            onClick={() => setThemeMode('light')}
+            className={`p-5 rounded-card border transition-all cursor-pointer space-y-3.5 ${
               themeMode === 'light'
-                ? 'bg-white/80 border-blue-500/50 shadow-blue-glow/20 ring-1 ring-blue-500/40 text-slate-900'
+                ? 'bg-white/90 border-blue-500/50 shadow-blue-glow/20 ring-2 ring-blue-500/40 text-slate-900'
                 : 'bg-white/[0.03] border-white/10 hover:border-white/20'
             }`}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Sun className="w-4 h-4 text-amber-400" />
+                <Sun className="w-4 h-4 text-amber-500" />
                 <span className={`text-sm font-bold ${themeMode === 'light' ? 'text-slate-900' : 'text-white'}`}>
-                  Translucent Ice (Light)
+                  White Mode (Clean Ice)
                 </span>
               </div>
               {themeMode === 'light' && <Check className="w-4 h-4 text-blue-600" />}
             </div>
             <p className={`text-xs leading-relaxed ${themeMode === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>
-              Soft white/blue-gray background (#F0F4F9) with translucent white liquid glass and crisp dark typography.
+              Crisp porcelain-white canvas with luminous frosted glass, high-contrast dark typography, and vibrant accents.
             </p>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setThemeMode('light');
+              }}
+              className={`w-full py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                themeMode === 'light'
+                  ? 'bg-blue-600 text-white shadow-sm border border-blue-400/40'
+                  : 'bg-white/5 text-slate-300 hover:bg-white/10 border border-white/10'
+              }`}
+            >
+              <Sun className="w-3.5 h-3.5" />
+              <span>{themeMode === 'light' ? 'Active Theme' : 'Enable White Mode'}</span>
+            </button>
           </div>
         </div>
       </GlassCard>

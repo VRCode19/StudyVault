@@ -346,4 +346,120 @@
     pointer-events: none;
     z-index: 1;
   }
+
+  /* ==========================================================================
+     White Mode (Light Mode) Comprehensive Visual System
+     ========================================================================== */
+
+  .light,
+  html.light,
+  body.light {
+    --bg-primary: #F8FAFC;
+    --bg-secondary: #F1F5F9;
+    --bg-tertiary: #E2E8F0;
+
+    --text-primary: #0F172A;
+    --text-secondary: #334155;
+    --text-tertiary: #64748B;
+
+    --glass-1: rgba(255, 255, 255, 0.75);
+    --glass-2: rgba(255, 255, 255, 0.88);
+    --glass-3: rgba(255, 255, 255, 0.95);
+    --glass-4: #FFFFFF;
+
+    --glass-border-1: rgba(15, 23, 42, 0.08);
+    --glass-border-2: rgba(15, 23, 42, 0.12);
+    --glass-border-3: rgba(15, 23, 42, 0.18);
+    --glass-specular: rgba(255, 255, 255, 0.95);
+  }
+
+  html.light body {
+    background-color: #F8FAFC !important;
+    color: #0F172A !important;
+  }
+
+  /* Deep high-contrast text in white mode */
+  html.light .text-white {
+    color: #0F172A !important;
+  }
+
+  html.light .text-slate-100,
+  html.light .text-slate-200 {
+    color: #1E293B !important;
+  }
+
+  html.light .text-slate-300,
+  html.light .text-slate-400 {
+    color: #475569 !important;
+  }
+
+  html.light .text-slate-500 {
+    color: #64748B !important;
+  }
+
+  /* White mode card surfaces */
+  html.light .bg-dark-950,
+  html.light .bg-dark-900,
+  html.light .bg-dark-850,
+  html.light .bg-dark-800,
+  html.light .bg-dark-750,
+  html.light .bg-navy-950,
+  html.light .bg-navy-900,
+  html.light .bg-navy-850,
+  html.light .bg-navy-800 {
+    background-color: rgba(255, 255, 255, 0.92) !important;
+  }
+
+  html.light .liquid-panel,
+  html.light .liquid-card,
+  html.light .liquid-glass-1,
+  html.light .liquid-glass-2,
+  html.light .liquid-glass-3,
+  html.light .liquid-glass-4 {
+    background: rgba(255, 255, 255, 0.90) !important;
+    border-color: rgba(15, 23, 42, 0.09) !important;
+    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.08), 0 0 1px 1px rgba(15, 23, 42, 0.04) !important;
+  }
+
+  /* Borders in white mode */
+  html.light [class*="border-white/"] {
+    border-color: rgba(15, 23, 42, 0.1) !important;
+  }
+
+  /* Subtle background pills and tags in white mode */
+  html.light [class*="bg-white/"] {
+    background-color: rgba(15, 23, 42, 0.05) !important;
+  }
+
+  html.light [class*="hover:bg-white/"]:hover {
+    background-color: rgba(15, 23, 42, 0.09) !important;
+  }
+
+  /* Inputs & form elements in white mode */
+  html.light input,
+  html.light textarea,
+  html.light select {
+    background-color: #FFFFFF !important;
+    color: #0F172A !important;
+    border-color: rgba(15, 23, 42, 0.15) !important;
+  }
+
+  html.light input::placeholder,
+  html.light textarea::placeholder {
+    color: #94A3B8 !important;
+  }
+
+  /* Sidebar and Topbar in white mode */
+  html.light aside,
+  html.light header {
+    background-color: rgba(255, 255, 255, 0.88) !important;
+    border-color: rgba(15, 23, 42, 0.1) !important;
+  }
+
+  /* Dropdowns and modals in white mode */
+  html.light .shadow-liquid-modal,
+  html.light .shadow-liquid-card {
+    box-shadow: 0 20px 45px -10px rgba(15, 23, 42, 0.12), 0 0 1px 1px rgba(15, 23, 42, 0.08) !important;
+  }
 }
+

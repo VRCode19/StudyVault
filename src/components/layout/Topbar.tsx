@@ -30,6 +30,7 @@ export const Topbar: React.FC<TopbarProps> = ({ onOpenMobileMenu }) => {
     markNotificationRead,
     clearAllNotifications,
     themeMode,
+    setThemeMode,
     toggleTheme,
   } = useStudyVault();
 
@@ -101,14 +102,39 @@ export const Topbar: React.FC<TopbarProps> = ({ onOpenMobileMenu }) => {
             <span className="hidden sm:inline text-xs font-semibold">AI Assistant</span>
           </GlassButton>
 
-          {/* Dark / Light Mode Toggle */}
-          <GlassIconButton
-            size="sm"
-            variant="glass"
-            icon={themeMode === 'light' ? <Moon className="w-4 h-4 text-indigo-400" /> : <Sun className="w-4 h-4 text-amber-300" />}
-            onClick={toggleTheme}
-            label={themeMode === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
-          />
+          {/* Dark Mode & White Mode Buttons */}
+          <div className="flex items-center p-1 rounded-full bg-white/[0.06] border border-white/15 backdrop-blur-md shadow-liquid-sm">
+            <button
+              type="button"
+              id="topbar-dark-mode-btn"
+              onClick={() => setThemeMode('dark')}
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                themeMode === 'dark'
+                  ? 'bg-blue-600 text-white shadow-sm border border-blue-400/40'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="Switch to Dark Mode"
+              aria-label="Dark Mode"
+            >
+              <Moon className="w-3.5 h-3.5 text-cyan-300" />
+              <span className="hidden sm:inline">Dark</span>
+            </button>
+            <button
+              type="button"
+              id="topbar-white-mode-btn"
+              onClick={() => setThemeMode('light')}
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                themeMode === 'light'
+                  ? 'bg-white text-slate-900 shadow-md border border-slate-300'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="Switch to White Mode"
+              aria-label="White Mode"
+            >
+              <Sun className="w-3.5 h-3.5 text-amber-500" />
+              <span className="hidden sm:inline">White</span>
+            </button>
+          </div>
 
           {/* Notifications Dropdown */}
           <div className="relative">

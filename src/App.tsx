@@ -76,7 +76,7 @@ const MainApp: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen liquid-bg-atmosphere text-slate-100 flex relative overflow-x-hidden selection:bg-blue-600/30">
+    <div className="min-h-screen liquid-bg-atmosphere flex relative overflow-x-hidden selection:bg-blue-600/30">
       {/* Layered Atmospheric Light Blooms */}
       <div className="pointer-events-none fixed inset-0 z-0">
         <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-blue-600/10 rounded-full blur-[140px]" />

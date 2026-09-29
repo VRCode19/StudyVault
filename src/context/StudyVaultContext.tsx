@@ -55,6 +55,8 @@ interface StudyVaultContextType {
   exams: ExamDeadline[];
   settings: StudySettings;
   themeMode: 'dark' | 'light';
+  setThemeMode: (mode: 'dark' | 'light') => void;
+  toggleTheme: () => void;
   toasts: ToastItem[];
   isSearchOpen: boolean;
   setIsSearchOpen: (open: boolean) => void;
@@ -74,7 +76,6 @@ interface StudyVaultContextType {
   applyChatActionCard: (messageId: string) => void;
   confirmExtraction: (messageId: string) => void;
   updateSettings: (newSettings: Partial<StudySettings>) => void;
-  toggleTheme: () => void;
   clearUserData: () => void;
   resetDemoData: () => void; // alias for clearUserData
   addSubject: (subject: Omit<Subject, 'id'>) => void;
@@ -515,18 +516,31 @@ export const StudyVaultProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const toggleTheme = () => {
     setThemeMode((prev) => {
       const next = prev === 'dark' ? 'light' : 'dark';
-      localStorage.setItem('studyvault_theme_mode', next);
+      try {
+        localStorage.setItem('studyvault_theme_mode', next);
+      } catch {}
       return next;
     });
+  };
+
+  const setThemeModeExplicit = (mode: 'dark' | 'light') => {
+    setThemeMode(mode);
+    try {
+      localStorage.setItem('studyvault_theme_mode', mode);
+    } catch {}
   };
 
   useEffect(() => {
     if (themeMode === 'light') {
       document.documentElement.classList.add('light');
       document.documentElement.classList.remove('dark');
+      document.body.classList.add('light');
+      document.body.classList.remove('dark');
     } else {
       document.documentElement.classList.add('dark');
       document.documentElement.classList.remove('light');
+      document.body.classList.add('dark');
+      document.body.classList.remove('light');
     }
   }, [themeMode]);
 
@@ -1741,6 +1755,7 @@ export const StudyVaultProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         exams,
         settings,
         themeMode,
+        setThemeMode: setThemeModeExplicit,
         toggleTheme,
         toasts,
         isSearchOpen,
