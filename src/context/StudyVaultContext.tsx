@@ -1156,7 +1156,18 @@ export const StudyVaultProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         }),
       };
 
-      const response = await aiService.askAssistant(text, [...chatMessages, userMsg], {
+      // Sanitize history so transient network/server error notices are never passed as conversation turns
+      const cleanHistory = chatMessages
+        .filter(
+          (m) =>
+            m.text &&
+            !m.text.includes('temporarily unavailable') &&
+            !m.text.includes("couldn't connect") &&
+            !m.text.includes('Notice')
+        )
+        .concat(userMsg);
+
+      const response = await aiService.askAssistant(text, cleanHistory, {
         files,
         conversationId,
         context: contextPayload,

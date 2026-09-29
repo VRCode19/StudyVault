@@ -170,6 +170,7 @@ export class ChatService {
     const toolsUsed: string[] = [];
     let pendingProposal: ActionCardProposal | undefined = undefined;
     let actions: Array<{ type: string; status: string; parameters?: any; details?: any }> = [];
+    let currentTurnAssistantReply: string | null = null;
     const MAX_TOOL_TURNS = 3;
 
     // 5. Autonomous multi-turn tool calling loop
@@ -198,6 +199,13 @@ export class ChatService {
 
       const assistantMessage = choice.message;
       messages.push(assistantMessage);
+
+      if (assistantMessage.content) {
+        currentTurnAssistantReply =
+          typeof assistantMessage.content === 'string'
+            ? assistantMessage.content
+            : JSON.stringify(assistantMessage.content);
+      }
 
       // Check if model called any tools
       if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
@@ -249,10 +257,7 @@ export class ChatService {
       }
 
       // If no tool calls, model returned final textual response
-      const replyText =
-        typeof assistantMessage.content === 'string'
-          ? assistantMessage.content
-          : JSON.stringify(assistantMessage.content);
+      const replyText = currentTurnAssistantReply;
 
       // If all subjects collected and no action proposal created yet, synthesize master timetable
       const currentOnboarding = conversationService.getOnboardingState(convId);
@@ -292,14 +297,7 @@ export class ChatService {
     }
 
     // 6. Resilient Fallback / Synthesis if tool loop ended or model response was empty
-    let replyText = '';
-    const lastAssistant = messages.filter((m) => m.role === 'assistant' && m.content).pop();
-    if (lastAssistant && lastAssistant.content) {
-      replyText =
-        typeof lastAssistant.content === 'string'
-          ? lastAssistant.content
-          : JSON.stringify(lastAssistant.content);
-    }
+    let replyText = currentTurnAssistantReply || '';
 
     const finalOnboarding = conversationService.getOnboardingState(convId);
 
@@ -371,6 +369,43 @@ export class ChatService {
         replyText = `I've successfully extracted your class timetable! Your weekly classes have been synced to your study plan.`;
       } else if (extractionData && extractionData.type === 'exam_timetable') {
         replyText = `I've extracted your exam schedule and synchronized your countdown deadlines.`;
+      } else if (/^(hi|hello|hey|greetings|good\s*(morning|afternoon|evening))\b/i.test(trimmedMsg)) {
+        replyText =
+          `👋 **Hello! I am StudyVault AI, your personal academic strategist.**\n\n` +
+          `I can help you:\n` +
+          `• **Plan & balance your weekly schedule** across all your subjects\n` +
+          `• **Analyze uploaded syllabi or class timetables**\n` +
+          `• **Track planned vs completed study hours** in real time\n` +
+          `• **Adapt study sessions** when you fall behind or need a break\n\n` +
+          `What would you like to work on today?`;
+      } else if (/today|schedule|what.*study|plan/i.test(trimmedMsg) && studyvaultContext) {
+        const todaySessions = studyvaultContext.todayScheduledSessions || [];
+        const progressList = studyvaultContext.subjectProgressToday || [];
+        const totalPlanned = progressList.reduce((acc: number, p: any) => acc + (p.plannedMinutes || 0), 0);
+        const totalCompleted = progressList.reduce((acc: number, p: any) => acc + (p.completedMinutes || 0), 0);
+        const totalRemaining = Math.max(0, totalPlanned - totalCompleted);
+
+        if (todaySessions.length > 0) {
+          const sessionList = todaySessions
+            .map((s: any) => `• **${s.subjectName}** (${s.startTime}): ${s.durationMinutes} min (${s.topicName || 'Focus'})`)
+            .join('\n');
+          replyText =
+            `📅 **Here is your schedule for today (${studyvaultContext.currentDate || 'Today'}):**\n\n` +
+            `${sessionList}\n\n` +
+            `⏱ **Target Summary**: ${totalCompleted}m completed of ${totalPlanned}m planned (${totalRemaining}m remaining).`;
+        } else {
+          replyText =
+            `📅 You have no scheduled study sessions for today (${studyvaultContext.currentDate || 'Today'}).\n\n` +
+            `Would you like me to schedule a focus block for one of your subjects?`;
+        }
+      } else if (/tired|exhausted|push.*task|skip|break|can'?t study/i.test(trimmedMsg)) {
+        replyText =
+          `🛋 **Take a well-deserved breather!** Consistent rest prevents burnout.\n\n` +
+          `I can automatically push your remaining tasks for today into your upcoming weekend buffer slots. Check your calendar or tell me how much time you'd like to adjust.`;
+      } else if (/exam|runway|deadline/i.test(trimmedMsg)) {
+        replyText =
+          `🎯 **Upcoming Exam Deadlines & Runway:**\n\n` +
+          `Check your Calendar view to see countdowns to your exam milestones. I will prioritize high-difficulty topics in your morning focus blocks leading up to test dates!`;
       } else {
         replyText =
           `I am StudyVault AI, your personal academic strategist.\n\n` +
